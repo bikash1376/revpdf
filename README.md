@@ -1,56 +1,71 @@
-# Welcome to your Expo app 👋
+# revpdf
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A minimalist, **fully local** document reader for **PDF, EPUB, DOC and DOCX** — built with
+Expo + React Native and Google's Material Design 3. Modeled on ReadEra's calm reading
+experience, with two signature additions: **hold-to-highlight** and a **Chrome-style selection
+search** sheet.
 
-## Get started
+Everything stays on the device. No accounts, no servers, no cloud.
 
-1. Install dependencies
+- Website: [revpdf.in](https://revpdf.in) · [Terms](https://revpdf.in/terms) · [Privacy](https://revpdf.in/privacy)
+- Full design & technical spec: [`SPEC.md`](./SPEC.md)
+- Progress tracker: [`PHASES.md`](./PHASES.md)
 
-   ```bash
-   npm install
-   ```
+## Features
 
-2. Start the app
+**Reading**
+- PDF, EPUB, DOC, DOCX (PDF fixed-layout; EPUB/DOCX reflowable).
+- Three reading themes: **Light / Dark / Sepia**. Dark text is a soft gray, never harsh white.
+- Typography (reflowable): font family (Alice, Comfortaa, Merriweather, Roboto, Noto Serif),
+  font size, font thickness, alignment (justify/left/center/right), hyphenation, page margins,
+  line spacing.
+- Per-document brightness, table of contents, in-document search, page thumbnails.
+- A chrome-free reading surface — controls stay out of the way and live in **Reader settings**.
 
-   ```bash
-   npx expo start
-   ```
+**Signature interactions**
+- **Hold-to-highlight** — long-press text to highlight and pick a marker color. Toggleable.
+- **Selection → search** — selecting text raises a draggable bottom sheet (preview → drag up for
+  full in-app results), powered by your chosen engine.
 
-In the output, you'll find options to open the app in a
+**Library**
+- "Reading Now" shelf with covers, format/size, progress and quick actions.
+- "About Document" detail screen; import via the system file picker.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+**Settings**
+- Theme, highlighting on/off, selection bottom sheet on/off with trigger
+  (**on selection** by default, or **tap a word**; scrolling never triggers it).
+- Search engine: Google / DuckDuckGo / Yandex / Yahoo / Disabled.
+- Reading mode (paginated / scroll) and the full reader display panel.
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+## Tech stack
 
-## Get a fresh project
+Expo SDK 54 · React Native 0.81 · expo-router 6 · react-native-paper (MD3) · Zustand ·
+expo-sqlite · react-native-webview · @gorhom/bottom-sheet · expo-brightness.
 
-When you're ready, run:
+Document rendering is WebView-based (PDF.js for PDF, epub.js for EPUB/DOCX) so text selection,
+highlighting and theming behave identically across formats.
+
+## Getting started
 
 ```bash
-npm run reset-project
+npm install
+npx expo start          # then press a for Android, or scan the QR with a dev build
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+> Some native modules (WebView, SQLite, brightness) require a **custom dev client** — Expo Go is
+> not sufficient. Build one with `npx expo run:android` (or EAS) when wiring up the reader engine.
 
-### Other setup steps
+## Project structure
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+```
+src/
+  app/                 expo-router routes (library, document, reader, settings)
+  components/          shared UI (DocumentCover, DocumentListItem, …)
+  db/                  expo-sqlite schema + queries
+  store/               Zustand stores (settings, library)
+  theme/               design tokens + MD3 themes
+  lib/                 small helpers
+ref/                   reference screenshots
+SPEC.md                product & technical specification
+PHASES.md              milestone progress
+```
