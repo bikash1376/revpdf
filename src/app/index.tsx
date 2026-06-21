@@ -1,3 +1,4 @@
+import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
@@ -67,7 +68,7 @@ export default function LibraryScreen() {
         </Appbar.Header>
       ) : (
         <Appbar.Header elevated>
-          <Appbar.Content title="Reading Now" />
+          <Appbar.Content title="Welcome back" />
           <Appbar.Action icon="magnify" onPress={() => setSearchOpen(true)} />
           <Appbar.Action icon="cog-outline" onPress={() => router.push('/settings')} />
         </Appbar.Header>
@@ -90,6 +91,11 @@ export default function LibraryScreen() {
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
+            <Image
+              source={require('@/assets/images/revpdf-logo.png')}
+              style={styles.emptyLogo}
+              contentFit="contain"
+            />
             <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
               Your library is empty
             </Text>
@@ -164,6 +170,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     padding: spacing.xl,
   },
+  emptyLogo: { width: 200, height: 68, marginBottom: spacing.md },
   emptySub: { textAlign: 'center', marginBottom: spacing.sm },
   fab: { position: 'absolute', right: spacing.md },
 });

@@ -11,6 +11,13 @@
 
 export type ThemeName = 'light' | 'dark' | 'sepia';
 
+/**
+ * Reader-only themes. The app chrome is limited to the three MD3 themes above,
+ * but the reading surface gets an extra "twilight" (dim blue-gray night theme)
+ * that only ever affects the document view, never the app chrome.
+ */
+export type ReaderThemeName = ThemeName | 'twilight';
+
 /** Ink-indigo seed and its tonal neighbours, shared across UI themes. */
 export const palette = {
   ink: '#3F51B5', // primary seed — "ink", not brand teal
@@ -66,6 +73,27 @@ export const readingSurfaces: Record<
   },
 };
 
+/** Twilight: a dim blue-gray night surface, available to the reader only. */
+const twilightSurface = {
+  background: '#1B2330',
+  surface: '#222C3A',
+  surfaceVariant: '#2C3848',
+  text: '#C0C8D2',
+  textSecondary: '#8B97A6',
+  link: '#7FB2E5',
+  outline: '#33414F',
+};
+
+/**
+ * Reading surfaces available to the document view. Superset of the app themes
+ * with the reader-only "twilight" added. Use this (keyed by ReaderThemeName)
+ * everywhere the reader paints its surface; use readingSurfaces for app chrome.
+ */
+export const readerSurfaces: Record<ReaderThemeName, (typeof readingSurfaces)[ThemeName]> = {
+  ...readingSurfaces,
+  twilight: twilightSurface,
+};
+
 /** Highlighter marker colors — the one place color is allowed to be loud. */
 export const highlightColors = [
   { key: 'yellow', value: '#FFE082', label: 'Yellow' },
@@ -73,6 +101,9 @@ export const highlightColors = [
   { key: 'blue', value: '#90CAF9', label: 'Blue' },
   { key: 'pink', value: '#F48FB1', label: 'Pink' },
   { key: 'orange', value: '#FFCC80', label: 'Orange' },
+  { key: 'purple', value: '#CE93D8', label: 'Purple' },
+  { key: 'teal', value: '#80CBC4', label: 'Teal' },
+  { key: 'red', value: '#EF9A9A', label: 'Red' },
 ] as const;
 
 export type HighlightColorKey = (typeof highlightColors)[number]['key'];

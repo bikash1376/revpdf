@@ -19,6 +19,7 @@ export type DocFormat =
 
 /** Reader theme tokens pushed into the document surface. */
 export type ReaderTheme = {
+  key: 'light' | 'dark' | 'sepia' | 'twilight';
   background: string;
   text: string;
   link: string;

@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { ScrollView, StyleSheet, View } from 'react-native';
@@ -118,6 +119,13 @@ export default function SettingsScreen() {
         </View>
 
         <Divider />
+        <View style={styles.aboutLogo}>
+          <Image
+            source={require('@/assets/images/revpdf-logo.png')}
+            style={styles.logo}
+            contentFit="contain"
+          />
+        </View>
         <List.Subheader>About</List.Subheader>
         <List.Item
           title="revpdf"
@@ -167,6 +175,8 @@ const styles = StyleSheet.create({
   segmentWrap: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   segmentInline: { marginVertical: spacing.sm },
   indent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: 4 },
+  aboutLogo: { alignItems: 'center', paddingTop: spacing.lg, paddingBottom: spacing.xs },
+  logo: { width: 168, height: 57 },
   builtBy: { textAlign: 'center', marginTop: spacing.lg },
   footer: { textAlign: 'center', marginTop: spacing.sm, paddingHorizontal: spacing.lg },
 });

@@ -1,11 +1,12 @@
 import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { Dimensions, StyleSheet, View } from 'react-native';
+import { Dimensions, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, IconButton, Text, useTheme } from 'react-native-paper';
 import { WebView } from 'react-native-webview';
 
 import { SEARCH_ENGINES, type SearchEngine } from '@/store/settings';
+import { highlightColors } from '@/theme/tokens';
 
 const SCREEN_H = Dimensions.get('window').height;
 
@@ -16,7 +17,7 @@ type Props = {
   searchEngine: SearchEngine;
   highlightingEnabled: boolean;
   canHighlight: boolean;
-  onHighlight: () => void;
+  onHighlight: (color: string) => void;
   onDismiss: () => void;
 };
 
@@ -35,14 +36,16 @@ export function SelectionSheet({
 }: Props) {
   const theme = useTheme();
   const sheetRef = useRef<BottomSheet>(null);
-  // Small peek (just the handle + one-line header), expands to near-full.
-  const snapPoints = useMemo(() => [84, '92%'], []);
 
   const searchEnabled = searchEngine !== 'disabled';
   const url = useMemo(() => {
     if (!selection || !searchEnabled) return null;
     return SEARCH_ENGINES[searchEngine].url(encodeURIComponent(selection.text));
   }, [selection, searchEngine, searchEnabled]);
+
+  // With search results: small peek that expands to near-full. Highlight-only
+  // (no search): a single compact snap so there's no big blank area to drag into.
+  const snapPoints = useMemo(() => (url ? [84, '92%'] : [148]), [url]);
 
   useEffect(() => {
     if (selection) sheetRef.current?.snapToIndex(0);
@@ -51,23 +54,11 @@ export function SelectionSheet({
 
   const handleClose = useCallback(() => onDismiss(), [onDismiss]);
 
-  if (!selection) {
-    // Keep the sheet mounted but closed so open/close animates cleanly.
-    return (
-      <BottomSheet
-        ref={sheetRef}
-        index={-1}
-        snapPoints={snapPoints}
-        enablePanDownToClose
-        onClose={handleClose}
-        backgroundStyle={{ backgroundColor: theme.colors.surface }}
-        handleIndicatorStyle={{ backgroundColor: theme.colors.onSurfaceVariant }}>
-        <BottomSheetView>
-          <View />
-        </BottomSheetView>
-      </BottomSheet>
-    );
-  }
+  // Fully unmount when there's nothing selected — otherwise an empty sheet stays
+  // mounted and can be dragged up from the bottom even when the feature is off.
+  if (!selection) return null;
+
+  const showHighlight = highlightingEnabled && canHighlight;
 
   return (
     <BottomSheet
@@ -86,14 +77,6 @@ export function SelectionSheet({
             style={[styles.headerText, { color: theme.colors.onSurface }]}>
             “{selection.text}”
           </Text>
-          {highlightingEnabled && canHighlight ? (
-            <IconButton
-              icon="marker"
-              size={22}
-              onPress={onHighlight}
-              iconColor={theme.colors.primary}
-            />
-          ) : null}
           {url ? (
             <IconButton
               icon="open-in-new"
@@ -103,6 +86,21 @@ export function SelectionSheet({
           ) : null}
           <IconButton icon="close" size={22} onPress={() => sheetRef.current?.close()} />
         </View>
+
+        {showHighlight ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.swatches}>
+            {highlightColors.map((c) => (
+              <Pressable
+                key={c.key}
+                onPress={() => onHighlight(c.value)}
+                style={[styles.swatch, { backgroundColor: c.value, borderColor: theme.colors.outline }]}
+              />
+            ))}
+          </ScrollView>
+        ) : null}
 
         {url ? (
           <View style={[styles.webWrap, { height: SCREEN_H * 0.9 }]}>
@@ -133,6 +131,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   headerText: { flex: 1 },
+  swatches: { flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingBottom: 12, paddingTop: 2 },
+  swatch: { width: 30, height: 30, borderRadius: 15, borderWidth: StyleSheet.hairlineWidth },
   webWrap: { width: '100%' },
   web: { flex: 1, backgroundColor: 'transparent' },
   loading: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },

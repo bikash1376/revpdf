@@ -75,6 +75,11 @@
   function wireContents(contents) {
     try {
       var doc = contents.document;
+      // Guard: epub.js fires both the `rendered` event and the content hook for
+      // each section, so without this the click listener is attached twice and
+      // every tap toggles the chrome twice — the "flashing" toolbar.
+      if (doc.__rpWired) return;
+      doc.__rpWired = true;
       doc.addEventListener('click', function (ev) {
         if (Date.now() < suppressTapUntil) return;
         var w = (contents.window && contents.window.innerWidth) || 0;
@@ -108,8 +113,13 @@
     var viewer = document.getElementById('viewer');
     if (!viewer) return;
     viewer.style.background = theme.background;
-    if (isDarkBg(theme.background)) viewer.classList.add('invert');
-    else viewer.classList.remove('invert');
+    // A PDF page is a baked white image, so the only way a reader theme can
+    // reach it is a CSS filter on the canvas. Drive it off the theme key so
+    // sepia/twilight actually tint the page (not just the margins).
+    ['t-light', 't-sepia', 't-dark', 't-twilight'].forEach(function (c) {
+      viewer.classList.remove(c);
+    });
+    viewer.classList.add('t-' + (theme.key || (isDarkBg(theme.background) ? 'dark' : 'light')));
   }
 
   function applyPdfZoom(t) {
@@ -147,8 +157,21 @@
     }
   }
 
+  function allowPinchZoom() {
+    // The base reader locks scale (good for paginated EPUB). PDF/reflow are
+    // fixed/long documents where pinch-to-zoom is expected, so relax it.
+    var vp = document.querySelector('meta[name=viewport]');
+    if (vp) {
+      vp.setAttribute(
+        'content',
+        'width=device-width, initial-scale=1, maximum-scale=6, user-scalable=yes, viewport-fit=cover',
+      );
+    }
+  }
+
   function loadPdf(buffer, location) {
     ensurePdfWorker();
+    allowPinchZoom();
     var viewer = document.getElementById('viewer');
     viewer.innerHTML = '';
     viewer.className = 'pdf';
@@ -252,6 +275,10 @@
       textDiv.className = 'textLayer';
       textDiv.style.width = Math.floor(viewport.width) + 'px';
       textDiv.style.height = Math.floor(viewport.height) + 'px';
+      // pdf.js v3 sizes/positions the selectable text spans from this CSS var.
+      // Without it the text layer is mis-scaled, so selection grabs the wrong
+      // words (or nothing) — the root cause of the broken PDF selection.
+      textDiv.style.setProperty('--scale-factor', String(viewport.scale));
       div.appendChild(textDiv);
       page.getTextContent().then(function (tc) {
         try {
@@ -485,13 +512,29 @@
           return;
         }
         mode = 'epub';
+        allowPinchZoom(); // pinch-to-zoom in the reading area (font size also zooms)
         book = ePub(buffer);
+        var epubFlow = lastTypography ? lastTypography.flow : 'paginated';
+        // The "continuous" manager pre-renders and stitches adjacent spine
+        // sections together. The default manager only mounts one section at a
+        // time and is the classic cause of EPUBs being stuck on the cover /
+        // first page inside a WebView (next()/prev() across section boundaries
+        // silently stalls). `snap` gives swipe page-turns in paginated flow.
         rendition = book.renderTo('viewer', {
+          manager: 'continuous',
           width: '100%',
           height: '100%',
-          flow: lastTypography ? lastTypography.flow : 'paginated',
+          flow: epubFlow,
           spread: 'none',
+          snap: epubFlow === 'paginated',
           allowScriptedContent: true,
+        });
+
+        // Re-layout on orientation / viewport changes so pagination stays sane.
+        window.addEventListener('resize', function () {
+          try {
+            if (rendition && rendition.resize) rendition.resize();
+          } catch (e) {}
         });
 
         rendition.on('relocated', function (loc) {
@@ -573,13 +616,25 @@
       }
       if (!rendition) return; // stashed in lastTheme; re-applied after epub display
       try {
+        var dark = theme.key === 'dark' || theme.key === 'twilight' || isDarkBg(theme.background);
         rendition.themes.override('color', theme.text, true);
         rendition.themes.override('background', theme.background, true);
-        rendition.themes.register('rp', {
-          body: { background: theme.background, color: theme.text },
+        var rules = {
+          body: { background: theme.background + ' !important', color: theme.text + ' !important' },
           a: { color: theme.link + ' !important' },
           '::selection': { background: 'rgba(120,120,160,0.35)' },
-        });
+        };
+        if (dark) {
+          // Many EPUBs hard-code black text in their own stylesheet, which a
+          // body-level color can't beat. On dark/twilight force the text color
+          // on the actual text elements so the page stays readable.
+          rules[
+            'p, div, span, li, blockquote, h1, h2, h3, h4, h5, h6, td, th, ' +
+              'em, strong, b, i, u, small, sup, sub, figcaption, section, ' +
+              'article, header, footer, pre, code, dt, dd, caption, label'
+          ] = { color: theme.text + ' !important' };
+        }
+        rendition.themes.register('rp', rules);
         rendition.themes.select('rp');
         document.body.style.background = theme.background;
       } catch (e) {
@@ -637,10 +692,14 @@
     addHighlight: function (id, cfiRange, color) {
       if (!rendition) return;
       try {
+        // multiply darkens nicely over a light page but turns invisible on a
+        // dark one; screen lightens so the marker shows on dark/twilight.
+        var dark =
+          lastTheme && (lastTheme.key === 'dark' || lastTheme.key === 'twilight');
         rendition.annotations.highlight(cfiRange, { id: id }, function () {}, 'hl-' + id, {
           fill: color,
-          'fill-opacity': '0.35',
-          'mix-blend-mode': 'multiply',
+          'fill-opacity': dark ? '0.45' : '0.35',
+          'mix-blend-mode': dark ? 'screen' : 'multiply',
         });
       } catch (e) {
         err(e);

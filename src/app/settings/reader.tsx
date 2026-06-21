@@ -1,11 +1,11 @@
 import Slider from '@react-native-community/slider';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { Appbar, Chip, Divider, List, SegmentedButtons, Switch, Text, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useSettings } from '@/store/settings';
-import { readingFonts, readingSurfaces, spacing, type ReadingFontKey } from '@/theme/tokens';
+import { readerSurfaces, readingFonts, spacing, type ReadingFontKey } from '@/theme/tokens';
 
 const PREVIEW =
   'Material Design is Google’s open-source design system for building beautiful, usable products. revpdf keeps the page in front and the controls out of the way.';
@@ -17,7 +17,12 @@ export default function ReaderSettingsScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const s = useSettings();
-  const surface = readingSurfaces[s.theme];
+  const surface = readerSurfaces[s.readerTheme];
+  // When opened from inside a PDF, font face/size don't apply (fixed layout) —
+  // fade those controls out. Reflowable formats (and the global entry from
+  // Settings, where no format is passed) keep them active.
+  const { format } = useLocalSearchParams<{ format?: string }>();
+  const isPdf = format === 'pdf';
 
   const previewFontFamily =
     s.fontFamily === 'original'
@@ -51,45 +56,50 @@ export default function ReaderSettingsScreen() {
         </View>
 
         <Text variant="bodySmall" style={[styles.note, { color: theme.colors.onSurfaceVariant }]}>
-          Font, alignment, spacing and margins apply to reflowable formats (EPUB, DOCX). PDF keeps
-          its fixed layout — only theme, brightness, zoom, highlight and search apply there.
+          This theme only changes the page you read — the app's own theme lives in Settings →
+          Appearance. Font, alignment, spacing and margins apply to reflowable formats (EPUB). PDF
+          keeps its fixed layout — pinch to zoom; theme, brightness, highlight and search apply there.
         </Text>
 
-        <List.Subheader>Theme</List.Subheader>
+        <List.Subheader>Reader theme</List.Subheader>
         <View style={styles.block}>
           <SegmentedButtons
-            value={s.theme}
-            onValueChange={(v) => s.set('theme', v as typeof s.theme)}
+            value={s.readerTheme}
+            onValueChange={(v) => s.set('readerTheme', v as typeof s.readerTheme)}
             buttons={[
               { value: 'light', label: 'Light' },
               { value: 'sepia', label: 'Sepia' },
+              { value: 'twilight', label: 'Twilight' },
               { value: 'dark', label: 'Dark' },
             ]}
           />
         </View>
 
         <List.Subheader>Font</List.Subheader>
-        <View style={styles.chips}>
+        <View style={[styles.chips, isPdf && styles.disabled]} pointerEvents={isPdf ? 'none' : 'auto'}>
           {readingFonts.map((f) => (
             <Chip
               key={f.key}
               selected={s.fontFamily === f.key}
               showSelectedCheck
+              disabled={isPdf}
               onPress={() => s.set('fontFamily', f.key)}>
               {f.label}
             </Chip>
           ))}
         </View>
 
-        <SliderRow
-          label="Font size"
-          value={s.fontSize}
-          min={80}
-          max={200}
-          step={5}
-          suffix="%"
-          onChange={(v) => s.set('fontSize', v)}
-        />
+        <View style={isPdf ? styles.disabled : undefined} pointerEvents={isPdf ? 'none' : 'auto'}>
+          <SliderRow
+            label="Font size"
+            value={s.fontSize}
+            min={80}
+            max={200}
+            step={5}
+            suffix="%"
+            onChange={(v) => s.set('fontSize', v)}
+          />
+        </View>
 
         <List.Subheader>Thickness</List.Subheader>
         <View style={styles.block}>
@@ -224,6 +234,7 @@ const styles = StyleSheet.create({
   note: { paddingHorizontal: spacing.lg, marginBottom: spacing.sm },
   block: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, paddingHorizontal: spacing.md },
+  disabled: { opacity: 0.4 },
   sliderRow: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
   sliderHeader: { flexDirection: 'row', justifyContent: 'space-between' },
 });

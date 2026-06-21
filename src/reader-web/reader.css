@@ -29,8 +29,27 @@ body {
   padding: 8px 0;
   box-sizing: border-box;
 }
-#viewer.pdf.invert .pdf-canvas {
+/* Reader-theme tint for PDF pages (the page itself is a baked white image, so
+   the theme can only reach it via a canvas filter). */
+#viewer.pdf.t-sepia .pdf-canvas {
+  filter: sepia(0.5) brightness(0.97) contrast(0.95);
+}
+#viewer.pdf.t-dark .pdf-canvas {
   filter: invert(1) hue-rotate(180deg);
+}
+#viewer.pdf.t-twilight .pdf-canvas {
+  filter: invert(1) hue-rotate(180deg);
+}
+/* Inverting a white page yields a black page; a screen-blended overlay recolors
+   that black to the twilight surface while leaving the (now light) text alone. */
+#viewer.pdf.t-twilight .pdf-page::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #1b2330;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  z-index: 1;
 }
 .pdf-page {
   position: relative;

@@ -41,3 +41,14 @@ example
 # generated native folders
 /ios
 /android
+
+# reference screenshots / scratch (not part of the app)
+ref/
+
+# local agent scratch (keep shared .claude/settings.json)
+.claude/settings.local.json
+
+# Astro site build artifacts (web/ source is committed)
+.astro/
+web/.astro/
+web/dist/

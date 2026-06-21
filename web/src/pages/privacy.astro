@@ -1,0 +1,90 @@
+---
+import Layout from '../layouts/Layout.astro';
+const updated = 'June 21, 2026';
+---
+
+<Layout
+  title="Privacy Policy — revpdf"
+  description="How revpdf handles your data: it doesn't. Everything stays on your device."
+>
+  <article class="legal section">
+    <a class="back" href="/">← Back to home</a>
+    <h1>Privacy Policy</h1>
+    <p class="muted">Last updated: {updated}</p>
+
+    <p class="lead">
+      revpdf is built to be private. It has no accounts and no servers, and it does not collect,
+      transmit or sell your personal data. Everything you do in the app stays on your device.
+    </p>
+
+    <h2>What we collect</h2>
+    <p>
+      <strong>Nothing.</strong> revpdf does not have user accounts and does not send your documents,
+      highlights, reading progress or settings anywhere. There is no analytics SDK and no advertising
+      in the app.
+    </p>
+
+    <h2>Where your data lives</h2>
+    <p>
+      Documents you import, your highlights, bookmarks, reading position and preferences are stored
+      locally on your device only. Uninstalling the app removes this data.
+    </p>
+
+    <h2>Permissions</h2>
+    <p>
+      revpdf asks only for access to files you explicitly pick (so it can open them) and, optionally,
+      screen brightness (so it can dim the screen for reading). It does not access your contacts,
+      location or photos beyond the files you choose.
+    </p>
+
+    <h2>In-app web search</h2>
+    <p>
+      When you select text and use the optional search feature, your query is sent to the search
+      engine you chose (for example Google or DuckDuckGo) in an in-app browser. That request is
+      governed by the chosen provider’s own privacy policy. This feature is entirely optional and can
+      be disabled in Settings.
+    </p>
+
+    <h2>This website</h2>
+    <p>
+      revpdf.in is a static informational site. It does not set tracking cookies. Fonts are loaded
+      from Google Fonts, which may receive your IP address as part of serving those files.
+    </p>
+
+    <h2>Children</h2>
+    <p>revpdf is suitable for general audiences and does not knowingly collect data from anyone.</p>
+
+    <h2>Changes</h2>
+    <p>
+      If this policy changes, we will update the date above. Material changes will be reflected on
+      this page.
+    </p>
+
+    <h2>Contact</h2>
+    <p>
+      Privacy questions? Reach out via <a href="https://bksh.site">bksh.site</a>.
+    </p>
+  </article>
+</Layout>
+
+<style>
+  .legal {
+    max-width: 720px;
+  }
+  .back {
+    display: inline-block;
+    margin-bottom: 24px;
+    font-weight: 500;
+  }
+  .legal h1 {
+    font-size: clamp(32px, 5vw, 44px);
+  }
+  .legal .lead {
+    font-size: 18px;
+    color: var(--on-surface-variant);
+  }
+  .legal h2 {
+    font-size: 22px;
+    margin-top: 32px;
+  }
+</style>

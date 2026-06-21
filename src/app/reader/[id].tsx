@@ -16,20 +16,22 @@ import {
 } from '@/db';
 import type { OutboundMessage, TocItem } from '@/reader/bridge';
 import { useSettings } from '@/store/settings';
-import { highlightColors, readingSurfaces } from '@/theme/tokens';
+import { readerSurfaces } from '@/theme/tokens';
 
 export default function ReaderScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const settings = useSettings();
-  const surface = readingSurfaces[settings.theme];
+  const surface = readerSurfaces[settings.readerTheme];
 
   const { id } = useLocalSearchParams<{ id: string }>();
   const readerRef = useRef<ReaderHandle>(null);
 
   const [doc, setDoc] = useState<DocumentRow | null>(null);
   const [highlights, setHighlights] = useState<{ id: string; cfiRange: string; color: string }[]>([]);
-  const [chrome, setChrome] = useState(false);
+  // Start with the toolbar visible so the title + menu are reachable on open;
+  // a center tap hides it for immersive reading.
+  const [chrome, setChrome] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [toc, setToc] = useState<TocItem[]>([]);
   const [progress, setProgress] = useState(0);
@@ -96,10 +98,9 @@ export default function ReaderScreen() {
 
   const canHighlight = !!selection?.cfiRange; // EPUB only (PDF has no CFI anchor yet)
 
-  const doHighlight = async () => {
+  const doHighlight = async (color: string) => {
     if (!selection || !id || !selection.cfiRange) return;
     const hid = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-    const color = highlightColors[0].value;
     readerRef.current?.addHighlight(hid, selection.cfiRange, color);
     await addHighlight({
       id: hid,
@@ -162,7 +163,7 @@ export default function ReaderScreen() {
                 title="Reader settings"
                 onPress={() => {
                   setMenuOpen(false);
-                  router.push('/settings/reader');
+                  router.push(`/settings/reader?format=${doc.format}`);
                 }}
               />
               <Menu.Item
@@ -199,7 +200,7 @@ export default function ReaderScreen() {
       {/* Chrome-style selection → search sheet (auto-loads results). */}
       <SelectionSheet
         selection={settings.bottomSheetEnabled || settings.highlightingEnabled ? selection : null}
-        searchEngine={settings.searchEngine}
+        searchEngine={settings.bottomSheetEnabled ? settings.searchEngine : 'disabled'}
         highlightingEnabled={settings.highlightingEnabled}
         canHighlight={canHighlight}
         onHighlight={doHighlight}

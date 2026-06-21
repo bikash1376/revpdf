@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import type { ReadingFontKey, ThemeName } from '../theme/tokens';
+import type { ReaderThemeName, ReadingFontKey, ThemeName } from '../theme/tokens';
 
 export type SearchEngine = 'google' | 'duckduckgo' | 'yandex' | 'yahoo' | 'disabled';
 export type BottomSheetTrigger = 'tap' | 'selection';
@@ -24,8 +24,10 @@ export const SEARCH_ENGINES: Record<
 };
 
 export type SettingsState = {
-  // appearance
+  // appearance — `theme` drives the app chrome only; `readerTheme` drives only
+  // the open document's reading surface (independent of the app theme).
   theme: ThemeName;
+  readerTheme: ReaderThemeName;
 
   // signature features
   highlightingEnabled: boolean;
@@ -54,13 +56,14 @@ export const useSettings = create<SettingsState>()(
   persist(
     (set) => ({
       theme: 'light',
+      readerTheme: 'light',
 
       highlightingEnabled: true,
       bottomSheetEnabled: true,
       bottomSheetTrigger: 'selection', // default per user decision
       searchEngine: 'google',
 
-      readingMode: 'paginated',
+      readingMode: 'scroll',
 
       fontFamily: 'original',
       fontSize: 100,

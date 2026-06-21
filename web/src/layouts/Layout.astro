@@ -1,0 +1,277 @@
+---
+export interface Props {
+  title?: string;
+  description?: string;
+}
+const {
+  title = 'revpdf — a quiet, private PDF & EPUB reader',
+  description = 'revpdf is a minimalist offline PDF and EPUB reader for Android. Highlights, reader themes, search and zoom — with no accounts and no servers.',
+} = Astro.props;
+const year = new Date().getFullYear();
+const nav = [
+  { href: '/#features', label: 'Features' },
+  { href: '/#download', label: 'Download' },
+];
+const ogImage = new URL('/revpdf.jpeg', Astro.site).href;
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:image" content={ogImage} />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content={ogImage} />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="/">
+        <img class="brand-logo" src="/revpdf-logo.png" alt="revpdf" width="621" height="210" />
+      </a>
+      <nav class="nav">
+        {nav.map((n) => <a href={n.href}>{n.label}</a>)}
+        <a class="btn btn-tonal" href="/#download">Get the app</a>
+      </nav>
+    </header>
+
+    <main>
+      <slot />
+    </main>
+
+    <footer class="footer">
+      <div class="footer-inner">
+        <div>
+          <img class="footer-logo" src="/revpdf-logo.png" alt="revpdf" width="621" height="210" />
+          <p class="muted">Everything stays on this device. No accounts, no servers.</p>
+        </div>
+        <nav class="footer-links">
+          <a href="/terms">Terms of Service</a>
+          <a href="/privacy">Privacy Policy</a>
+          <a href="https://bksh.site" target="_blank" rel="noopener">Built by Bikash</a>
+        </nav>
+      </div>
+      <p class="copyright muted">© {year} revpdf · revpdf.in</p>
+    </footer>
+  </body>
+</html>
+
+<style is:global>
+  :root {
+    /* MD3 ink-indigo tokens, mirrored from the app's theme. */
+    --primary: #3f51b5;
+    --primary-bright: #5c6bc0;
+    --primary-deep: #2a3578;
+    --primary-container: #dee1ff;
+    --on-primary: #ffffff;
+    --on-primary-container: #2a3578;
+
+    --background: #fbfbfe;
+    --surface: #ffffff;
+    --surface-variant: #eeeef3;
+    --on-surface: #1b1b1f;
+    --on-surface-variant: #5b5d66;
+    --outline: #c9cad2;
+
+    /* a hint of the reader's sepia + twilight, used as accents */
+    --sepia: #f4ecd8;
+    --twilight: #1b2330;
+
+    --radius-sm: 12px;
+    --radius-lg: 28px;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.1);
+    --shadow-2: 0 4px 12px rgba(31, 33, 56, 0.12);
+    --maxw: 1080px;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    margin: 0;
+    font-family: 'Roboto', system-ui, -apple-system, sans-serif;
+    color: var(--on-surface);
+    background: var(--background);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1,
+  h2,
+  h3 {
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    margin: 0 0 0.4em;
+  }
+  p {
+    margin: 0 0 1em;
+  }
+  a {
+    color: var(--primary);
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
+  .muted {
+    color: var(--on-surface-variant);
+  }
+  .material-symbols-outlined {
+    font-family: 'Material Symbols Outlined';
+    font-weight: normal;
+    font-style: normal;
+    line-height: 1;
+    -webkit-font-feature-settings: 'liga';
+    user-select: none;
+  }
+
+  /* ---- top bar ---- */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px clamp(16px, 5vw, 40px);
+    background: rgba(251, 251, 254, 0.8);
+    backdrop-filter: saturate(180%) blur(12px);
+    border-bottom: 1px solid var(--outline);
+  }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--on-surface);
+    font-weight: 700;
+  }
+  .brand:hover {
+    text-decoration: none;
+  }
+  .brand-logo {
+    height: 30px;
+    width: auto;
+    display: block;
+  }
+  .footer-logo {
+    height: 34px;
+    width: auto;
+    display: block;
+    margin-bottom: 4px;
+  }
+  .brand-name {
+    font-size: 20px;
+    font-weight: 700;
+  }
+  .nav {
+    display: flex;
+    align-items: center;
+    gap: clamp(12px, 3vw, 28px);
+  }
+  .nav > a {
+    color: var(--on-surface-variant);
+    font-weight: 500;
+  }
+  .nav > a:hover {
+    color: var(--on-surface);
+    text-decoration: none;
+  }
+
+  /* ---- buttons ---- */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 22px;
+    border-radius: 999px;
+    font-weight: 500;
+    font-size: 15px;
+    border: none;
+    cursor: pointer;
+    transition:
+      box-shadow 0.2s,
+      filter 0.2s,
+      background 0.2s;
+  }
+  .btn:hover {
+    text-decoration: none;
+  }
+  .btn-filled {
+    background: var(--primary);
+    color: var(--on-primary);
+    box-shadow: var(--shadow-1);
+  }
+  .btn-filled:hover {
+    filter: brightness(1.07);
+    box-shadow: var(--shadow-2);
+  }
+  .btn-tonal {
+    background: var(--primary-container);
+    color: var(--on-primary-container);
+  }
+  .btn-tonal:hover {
+    filter: brightness(0.98);
+  }
+
+  /* ---- layout helpers ---- */
+  main {
+    min-height: 60vh;
+  }
+  .section {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: clamp(48px, 8vw, 96px) clamp(16px, 5vw, 40px);
+  }
+
+  /* ---- footer ---- */
+  .footer {
+    border-top: 1px solid var(--outline);
+    background: var(--surface);
+    margin-top: 48px;
+  }
+  .footer-inner {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 40px clamp(16px, 5vw, 40px) 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    justify-content: space-between;
+  }
+  .footer-inner p {
+    margin: 6px 0 0;
+    max-width: 320px;
+  }
+  .footer-links {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .footer-links a {
+    color: var(--on-surface-variant);
+    font-weight: 500;
+  }
+  .copyright {
+    text-align: center;
+    font-size: 14px;
+    padding: 16px;
+    margin: 0;
+  }
+</style>

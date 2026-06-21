@@ -20,7 +20,7 @@ import {
 } from '@/reader/bridge';
 import { loadReaderHtml } from '@/reader/readerHtml';
 import { useSettings } from '@/store/settings';
-import { readingFonts, readingSurfaces } from '@/theme/tokens';
+import { readerSurfaces, readingFonts } from '@/theme/tokens';
 
 export type ReaderHandle = {
   next: () => void;
@@ -39,9 +39,9 @@ type Props = {
   onMessage?: (msg: OutboundMessage) => void;
 };
 
-function themeFromSettings(name: ReturnType<typeof useSettings.getState>['theme']): ReaderTheme {
-  const s = readingSurfaces[name];
-  return { background: s.background, text: s.text, link: s.link };
+function themeFromSettings(name: ReturnType<typeof useSettings.getState>['readerTheme']): ReaderTheme {
+  const s = readerSurfaces[name];
+  return { key: name, background: s.background, text: s.text, link: s.link };
 }
 
 function typographyFromSettings(s: ReturnType<typeof useSettings.getState>): ReaderTypography {
@@ -67,7 +67,8 @@ export const ReaderWebView = forwardRef<ReaderHandle, Props>(function ReaderWebV
   const ready = useRef(false);
 
   const settings = useSettings();
-  const theme = useMemo(() => themeFromSettings(settings.theme), [settings.theme]);
+  const [loading, setLoading] = useState(true);
+  const theme = useMemo(() => themeFromSettings(settings.readerTheme), [settings.readerTheme]);
   const typography = useMemo(
     () => typographyFromSettings(settings),
     [
@@ -130,9 +131,11 @@ export const ReaderWebView = forwardRef<ReaderHandle, Props>(function ReaderWebV
       handleReady();
       return;
     }
-    if (msg.type === 'loaded' && highlights?.length) {
-      webRef.current?.injectJavaScript(cmd.renderHighlights(highlights));
+    if (msg.type === 'loaded') {
+      setLoading(false);
+      if (highlights?.length) webRef.current?.injectJavaScript(cmd.renderHighlights(highlights));
     }
+    if (msg.type === 'error') setLoading(false);
     onMessage?.(msg);
   };
 
@@ -145,24 +148,32 @@ export const ReaderWebView = forwardRef<ReaderHandle, Props>(function ReaderWebV
   }
 
   return (
-    <WebView
-      ref={webRef}
-      originWhitelist={['*']}
-      source={{ html, baseUrl: 'https://revpdf.local/' }}
-      onMessage={handleMessage}
-      style={{ flex: 1, backgroundColor: theme.background }}
-      containerStyle={{ flex: 1 }}
-      javaScriptEnabled
-      domStorageEnabled
-      allowFileAccess
-      allowUniversalAccessFromFileURLs
-      setSupportMultipleWindows={false}
-      overScrollMode="never"
-      scrollEnabled={settings.readingMode === 'scroll'}
-    />
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
+      <WebView
+        ref={webRef}
+        originWhitelist={['*']}
+        source={{ html, baseUrl: 'https://revpdf.local/' }}
+        onMessage={handleMessage}
+        style={{ flex: 1, backgroundColor: theme.background }}
+        containerStyle={{ flex: 1 }}
+        javaScriptEnabled
+        domStorageEnabled
+        allowFileAccess
+        allowUniversalAccessFromFileURLs
+        setSupportMultipleWindows={false}
+        overScrollMode="never"
+        scrollEnabled={settings.readingMode === 'scroll'}
+      />
+      {loading && (
+        <View style={[styles.overlay, { backgroundColor: theme.background }]} pointerEvents="none">
+          <ActivityIndicator color={theme.link} />
+        </View>
+      )}
+    </View>
   );
 });
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  overlay: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
 });
