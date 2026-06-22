@@ -201,6 +201,7 @@ export default function ReaderScreen() {
       <SelectionSheet
         selection={settings.bottomSheetEnabled || settings.highlightingEnabled ? selection : null}
         searchEngine={settings.bottomSheetEnabled ? settings.searchEngine : 'disabled'}
+        openLinksIn={settings.openLinksIn}
         highlightingEnabled={settings.highlightingEnabled}
         canHighlight={canHighlight}
         onHighlight={doHighlight}

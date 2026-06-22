@@ -274,4 +274,23 @@ const ogImage = new URL('/revpdf.jpeg', Astro.site).href;
     padding: 16px;
     margin: 0;
   }
+
+  /* ---- responsive ---- */
+  @media (max-width: 600px) {
+    .topbar {
+      padding: 12px 16px;
+    }
+    /* keep the brand + primary CTA; drop the inline text links to avoid crowding */
+    .nav > a:not(.btn) {
+      display: none;
+    }
+    .btn {
+      padding: 11px 18px;
+      font-size: 14px;
+    }
+    .footer-inner {
+      flex-direction: column;
+      gap: 16px;
+    }
+  }
 </style>

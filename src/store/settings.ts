@@ -12,6 +12,7 @@ export type SearchEngine = 'google' | 'duckduckgo' | 'yandex' | 'yahoo' | 'disab
 export type BottomSheetTrigger = 'tap' | 'selection';
 export type ReadingMode = 'paginated' | 'scroll';
 export type TextAlign = 'justify' | 'left' | 'center' | 'right';
+export type OpenLinksIn = 'in-app' | 'external';
 
 export const SEARCH_ENGINES: Record<
   Exclude<SearchEngine, 'disabled'>,
@@ -34,6 +35,7 @@ export type SettingsState = {
   bottomSheetEnabled: boolean;
   bottomSheetTrigger: BottomSheetTrigger;
   searchEngine: SearchEngine;
+  openLinksIn: OpenLinksIn; // where result links open: in-app mini browser or system browser
 
   // reader behavior
   readingMode: ReadingMode;
@@ -62,6 +64,7 @@ export const useSettings = create<SettingsState>()(
       bottomSheetEnabled: true,
       bottomSheetTrigger: 'selection', // default per user decision
       searchEngine: 'google',
+      openLinksIn: 'in-app',
 
       readingMode: 'scroll',
 

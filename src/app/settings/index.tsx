@@ -105,6 +105,24 @@ export default function SettingsScreen() {
           onPress={() => router.push('/settings/search')}
         />
 
+        <View style={styles.indent}>
+          <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>
+            Open links
+          </Text>
+          <SegmentedButtons
+            value={s.openLinksIn}
+            onValueChange={(v) => s.set('openLinksIn', v as typeof s.openLinksIn)}
+            style={styles.segmentInline}
+            buttons={[
+              { value: 'in-app', label: 'In app', icon: 'application-outline' },
+              { value: 'external', label: 'Browser', icon: 'open-in-new' },
+            ]}
+          />
+          <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+            Where result links open: a mini browser inside revpdf, or your phone’s browser.
+          </Text>
+        </View>
+
         <Divider />
         <List.Subheader>Reading</List.Subheader>
         <View style={styles.segmentWrap}>

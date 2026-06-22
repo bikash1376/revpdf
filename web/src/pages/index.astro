@@ -3,6 +3,15 @@ import Layout from '../layouts/Layout.astro';
 
 const PLAY_STORE_URL = '#'; // TODO: replace with the real Play Store listing
 
+// Drop real device screenshots into web/public/screenshots/ (same filenames) to
+// replace the generated placeholders.
+const shots = [
+  { src: '/screenshots/light.png', caption: 'Light' },
+  { src: '/screenshots/sepia.png', caption: 'Sepia' },
+  { src: '/screenshots/twilight.png', caption: 'Twilight' },
+  { src: '/screenshots/dark.png', caption: 'Dark' },
+];
+
 const features = [
   {
     icon: 'menu_book',
@@ -93,6 +102,39 @@ const features = [
           </article>
         ))
       }
+    </div>
+  </section>
+
+  <!-- Screenshots -->
+  <section class="section" id="screenshots">
+    <div class="section-head">
+      <h2>See it in action</h2>
+      <p class="muted">The same page, four reading themes. Quiet by default.</p>
+    </div>
+    <div class="shots">
+      {
+        shots.map((s) => (
+          <figure class="shot">
+            <img src={s.src} alt={`revpdf — ${s.caption} theme`} loading="lazy" />
+            <figcaption class="muted">{s.caption}</figcaption>
+          </figure>
+        ))
+      }
+    </div>
+  </section>
+
+  <!-- Video -->
+  <section class="section video-section" id="demo">
+    <div class="section-head">
+      <h2>Watch the walkthrough</h2>
+      <p class="muted">A quick look at importing, reading and highlighting.</p>
+    </div>
+    <div class="video-frame">
+      <!-- Drop a real clip at web/public/media/demo.mp4 to enable playback. -->
+      <video controls playsinline preload="none" poster="/media/demo-poster.png">
+        <source src="/media/demo.mp4" type="video/mp4" />
+        Your browser doesn’t support embedded video.
+      </video>
     </div>
   </section>
 
@@ -230,6 +272,52 @@ const features = [
     margin: 0;
   }
 
+  /* screenshots */
+  .shots {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: clamp(12px, 2.5vw, 24px);
+  }
+  .shot {
+    margin: 0;
+    text-align: center;
+  }
+  .shot img {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 9 / 19;
+    object-fit: cover;
+    border-radius: 22px;
+    border: 1px solid var(--outline);
+    box-shadow: var(--shadow-1);
+    background: var(--surface-variant);
+  }
+  .shot figcaption {
+    margin-top: 10px;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  /* video */
+  .video-section {
+    padding-top: 0;
+  }
+  .video-frame {
+    max-width: 880px;
+    margin: 0 auto;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: var(--shadow-2);
+    border: 1px solid var(--outline);
+    background: #000;
+  }
+  .video-frame video {
+    display: block;
+    width: 100%;
+    aspect-ratio: 16 / 9;
+    background: var(--surface-variant);
+  }
+
   /* cta band */
   .cta-band {
     background: linear-gradient(135deg, var(--primary-deep), var(--primary));
@@ -268,6 +356,16 @@ const features = [
     .device {
       order: -1;
       margin-bottom: 8px;
+    }
+    .shots {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width: 520px) {
+    .hero-cta .btn {
+      width: 100%;
+      justify-content: center;
     }
   }
 </style>
