@@ -45,9 +45,12 @@ export type OutboundMessage =
   | { type: 'loaded'; toc: TocItem[]; chapterCount: number }
   | { type: 'location'; cfi: string; progress: number; chapter: string }
   | { type: 'tap'; zone: 'left' | 'center' | 'right' }
+  | { type: 'link'; href: string }
   | { type: 'selection'; text: string; cfiRange: string }
   | { type: 'selectionCleared' }
+  | { type: 'highlightTapped'; id: string; cfiRange: string }
   | { type: 'searchResults'; query: string; count: number }
+  | { type: 'findResults'; query: string; count: number; index: number }
   | { type: 'error'; message: string };
 
 export function parseOutbound(raw: string): OutboundMessage | null {
@@ -78,6 +81,12 @@ export const cmd = {
   removeHighlight: (id: string) => call('removeHighlight', id),
   renderHighlights: (items: { id: string; cfiRange: string; color: string }[]) =>
     call('renderHighlights', items),
+  clearAllHighlights: () => call('clearAllHighlights'),
+  setNativeMenu: (enabled: boolean) => call('setNativeMenu', enabled),
   search: (query: string) => call('search', query),
+  findInDoc: (query: string) => call('findInDoc', query),
+  findNext: () => call('findNext'),
+  findPrev: () => call('findPrev'),
+  clearFind: () => call('clearFind'),
   clearSelection: () => call('clearSelection'),
 };

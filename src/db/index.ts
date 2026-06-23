@@ -193,3 +193,17 @@ export async function deleteHighlight(id: string): Promise<void> {
   const db = await getDb();
   await db.runAsync(`DELETE FROM highlights WHERE id = ?`, id);
 }
+
+export async function clearHighlights(documentId: string): Promise<void> {
+  const db = await getDb();
+  await db.runAsync(`DELETE FROM highlights WHERE document_id = ?`, documentId);
+}
+
+export async function countHighlights(documentId: string): Promise<number> {
+  const db = await getDb();
+  const row = await db.getFirstAsync<{ n: number }>(
+    `SELECT COUNT(*) AS n FROM highlights WHERE document_id = ?`,
+    documentId,
+  );
+  return row?.n ?? 0;
+}

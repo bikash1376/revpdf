@@ -9,7 +9,6 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import type { ReaderThemeName, ReadingFontKey, ThemeName } from '../theme/tokens';
 
 export type SearchEngine = 'google' | 'duckduckgo' | 'yandex' | 'yahoo' | 'disabled';
-export type BottomSheetTrigger = 'tap' | 'selection';
 export type ReadingMode = 'paginated' | 'scroll';
 export type TextAlign = 'justify' | 'left' | 'center' | 'right';
 export type OpenLinksIn = 'in-app' | 'external';
@@ -33,9 +32,10 @@ export type SettingsState = {
   // signature features
   highlightingEnabled: boolean;
   bottomSheetEnabled: boolean;
-  bottomSheetTrigger: BottomSheetTrigger;
   searchEngine: SearchEngine;
   openLinksIn: OpenLinksIn; // where result links open: in-app mini browser or system browser
+  nativeSelectionMenu: boolean; // show the OS copy/paste/share menu on text selection
+  selectionPeekHeight: number; // px height the selection sheet peeks to on open
 
   // reader behavior
   readingMode: ReadingMode;
@@ -62,9 +62,10 @@ export const useSettings = create<SettingsState>()(
 
       highlightingEnabled: true,
       bottomSheetEnabled: true,
-      bottomSheetTrigger: 'selection', // default per user decision
       searchEngine: 'google',
       openLinksIn: 'in-app',
+      nativeSelectionMenu: false,
+      selectionPeekHeight: 168,
 
       readingMode: 'scroll',
 

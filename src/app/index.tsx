@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
+import { BackHandler, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import {
   Appbar,
   Button,
@@ -23,7 +23,8 @@ import { spacing } from '@/theme/tokens';
 export default function LibraryScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { documents, importing, refresh, importFiles, remove, toggleFavorite } = useLibrary();
+  const { documents, importing, loading, refresh, importFiles, remove, toggleFavorite } =
+    useLibrary();
 
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -33,6 +34,20 @@ export default function LibraryScreen() {
     useCallback(() => {
       refresh();
     }, [refresh]),
+  );
+
+  // On the library (root) screen the hardware back / gesture would exit the app.
+  // When the search bar is open, intercept it to close search first instead.
+  useFocusEffect(
+    useCallback(() => {
+      if (!searchOpen) return;
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        setSearchOpen(false);
+        setQuery('');
+        return true;
+      });
+      return () => sub.remove();
+    }, [searchOpen]),
   );
 
   const filtered = query
@@ -81,6 +96,14 @@ export default function LibraryScreen() {
           filtered.length === 0 ? styles.emptyContainer : { paddingBottom: insets.bottom + 96 }
         }
         ItemSeparatorComponent={Divider}
+        refreshControl={
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={refresh}
+            colors={[theme.colors.primary]}
+            tintColor={theme.colors.primary}
+          />
+        }
         renderItem={({ item }) => (
           <DocumentListItem
             doc={item}

@@ -28,8 +28,13 @@ export type ReaderHandle = {
   gotoCfi: (cfi: string) => void;
   gotoHref: (href: string) => void;
   search: (q: string) => void;
+  findInDoc: (q: string) => void;
+  findNext: () => void;
+  findPrev: () => void;
+  clearFind: () => void;
   addHighlight: (id: string, cfiRange: string, color: string) => void;
   removeHighlight: (id: string) => void;
+  clearAllHighlights: () => void;
   clearSelection: () => void;
 };
 
@@ -65,6 +70,12 @@ export const ReaderWebView = forwardRef<ReaderHandle, Props>(function ReaderWebV
   const webRef = useRef<WebView>(null);
   const [html, setHtml] = useState<string | null>(null);
   const ready = useRef(false);
+  // Becomes true on the engine's `loaded` message; gates the highlight sync so
+  // we only draw once the book/spine exists (fixes highlights loaded from the
+  // DB after the engine finished rendering — they used to be dropped).
+  const [engineLoaded, setEngineLoaded] = useState(false);
+  // id -> last drawn {cfiRange,color}, so the sync effect can diff adds/removes.
+  const drawn = useRef<Map<string, { cfiRange: string; color: string }>>(new Map());
 
   const settings = useSettings();
   const [loading, setLoading] = useState(true);
@@ -89,9 +100,14 @@ export const ReaderWebView = forwardRef<ReaderHandle, Props>(function ReaderWebV
     gotoCfi: (cfi) => webRef.current?.injectJavaScript(cmd.gotoCfi(cfi)),
     gotoHref: (href) => webRef.current?.injectJavaScript(cmd.gotoHref(href)),
     search: (q) => webRef.current?.injectJavaScript(cmd.search(q)),
+    findInDoc: (q) => webRef.current?.injectJavaScript(cmd.findInDoc(q)),
+    findNext: () => webRef.current?.injectJavaScript(cmd.findNext()),
+    findPrev: () => webRef.current?.injectJavaScript(cmd.findPrev()),
+    clearFind: () => webRef.current?.injectJavaScript(cmd.clearFind()),
     addHighlight: (id, cfiRange, color) =>
       webRef.current?.injectJavaScript(cmd.addHighlight(id, cfiRange, color)),
     removeHighlight: (id) => webRef.current?.injectJavaScript(cmd.removeHighlight(id)),
+    clearAllHighlights: () => webRef.current?.injectJavaScript(cmd.clearAllHighlights()),
     clearSelection: () => webRef.current?.injectJavaScript(cmd.clearSelection()),
   }));
 
@@ -107,10 +123,40 @@ export const ReaderWebView = forwardRef<ReaderHandle, Props>(function ReaderWebV
     if (ready.current) webRef.current?.injectJavaScript(cmd.applyTypography(typography));
   }, [typography]);
 
+  // Push the native-selection-menu preference whenever it changes.
+  useEffect(() => {
+    if (ready.current)
+      webRef.current?.injectJavaScript(cmd.setNativeMenu(settings.nativeSelectionMenu));
+  }, [settings.nativeSelectionMenu]);
+
+  // Keep the WebView's highlight overlays in sync with the DB-backed list. Runs
+  // once the engine is loaded and whenever the list changes (add, recolor,
+  // single delete, or clear-all), diffing against what's currently drawn.
+  useEffect(() => {
+    if (!engineLoaded) return;
+    const next = new Map((highlights ?? []).map((h) => [h.id, h]));
+    // Remove overlays no longer present.
+    drawn.current.forEach((_v, id) => {
+      if (!next.has(id)) {
+        webRef.current?.injectJavaScript(cmd.removeHighlight(id));
+        drawn.current.delete(id);
+      }
+    });
+    // Add new overlays / redraw recolored ones.
+    next.forEach((h, id) => {
+      const prev = drawn.current.get(id);
+      if (!prev || prev.cfiRange !== h.cfiRange || prev.color !== h.color) {
+        webRef.current?.injectJavaScript(cmd.addHighlight(h.id, h.cfiRange, h.color));
+        drawn.current.set(id, { cfiRange: h.cfiRange, color: h.color });
+      }
+    });
+  }, [highlights, engineLoaded]);
+
   const handleReady = async () => {
     ready.current = true;
     webRef.current?.injectJavaScript(cmd.applyTheme(theme));
     webRef.current?.injectJavaScript(cmd.applyTypography(typography));
+    webRef.current?.injectJavaScript(cmd.setNativeMenu(settings.nativeSelectionMenu));
     try {
       const base64 = await new File(doc.file_uri).base64();
       if (!base64.length) {
@@ -133,7 +179,9 @@ export const ReaderWebView = forwardRef<ReaderHandle, Props>(function ReaderWebV
     }
     if (msg.type === 'loaded') {
       setLoading(false);
-      if (highlights?.length) webRef.current?.injectJavaScript(cmd.renderHighlights(highlights));
+      // Force the sync effect to (re)apply highlights now the engine is ready.
+      drawn.current.clear();
+      setEngineLoaded(true);
     }
     if (msg.type === 'error') setLoading(false);
     onMessage?.(msg);

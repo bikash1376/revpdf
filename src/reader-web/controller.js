@@ -15,7 +15,24 @@
 
   var mode = null; // 'epub' | 'pdf'
   var lastTheme = null;
+  var hlCfi = {}; // highlight id -> cfiRange (epub.js keys annotations by CFI)
+  var allowNativeMenu = false; // show the OS copy/paste/share menu on selection
   var pdf = { doc: null, total: 0, scale: 1, current: 1, theme: null, observer: null };
+
+  // epub.js positions annotation overlays once, so they drift out of place after
+  // a resize, theme change, font (re)flow or section re-render — the classic
+  // "highlight is in the wrong spot after reopening" bug. Re-rendering each
+  // view's annotation pane snaps them back onto the text.
+  // See https://github.com/johnfactotum/epubjs-tips
+  function redrawAnnotations() {
+    try {
+      if (rendition && rendition.views) {
+        rendition.views().forEach(function (view) {
+          if (view && view.pane && view.pane.render) view.pane.render();
+        });
+      }
+    } catch (e) {}
+  }
 
   function post(msg) {
     if (window.ReactNativeWebView) {
@@ -24,6 +41,28 @@
   }
   function err(message) {
     post({ type: 'error', message: String(message) });
+  }
+
+  // Walk up from a clicked node to the enclosing <a href>, if any. The click
+  // target can be a text node (some WebView builds), so we tolerate any node
+  // type and only test elements on the way up.
+  function closestAnchor(node) {
+    while (node) {
+      if (
+        node.nodeType === 1 &&
+        node.tagName &&
+        node.tagName.toLowerCase() === 'a' &&
+        node.getAttribute('href')
+      ) {
+        return node;
+      }
+      node = node.parentNode;
+    }
+    return null;
+  }
+  // Links we hand back to RN to open in the in-app / system browser.
+  function isExternalHref(href) {
+    return /^(https?:|mailto:|tel:)/i.test(href || '');
   }
 
   window.onerror = function (message, source, line) {
@@ -80,17 +119,37 @@
       // every tap toggles the chrome twice — the "flashing" toolbar.
       if (doc.__rpWired) return;
       doc.__rpWired = true;
-      doc.addEventListener('click', function (ev) {
-        if (Date.now() < suppressTapUntil) return;
-        var w = (contents.window && contents.window.innerWidth) || 0;
-        var x = ev.clientX || 0;
-        var zone = 'center';
-        if (w > 0) {
-          if (x < w * 0.3) zone = 'left';
-          else if (x > w * 0.7) zone = 'right';
-        }
-        post({ type: 'tap', zone: zone });
-      });
+      // Capture phase so we intercept external-link taps before epub.js' own
+      // handler (which rewrites absolute links to target="_blank" — a no-op in
+      // this WebView since multiple windows are disabled, so the tap looked dead).
+      doc.addEventListener(
+        'click',
+        function (ev) {
+          var a = closestAnchor(ev.target);
+          if (a) {
+            var href = a.getAttribute('href') || '';
+            if (isExternalHref(href)) {
+              ev.preventDefault();
+              ev.stopPropagation();
+              suppressTapUntil = Date.now() + 400;
+              post({ type: 'link', href: href });
+            }
+            // Internal links fall through to epub.js for in-book navigation;
+            // either way a link tap never toggles the reader chrome.
+            return;
+          }
+          if (Date.now() < suppressTapUntil) return;
+          var w = (contents.window && contents.window.innerWidth) || 0;
+          var x = ev.clientX || 0;
+          var zone = 'center';
+          if (w > 0) {
+            if (x < w * 0.3) zone = 'left';
+            else if (x > w * 0.7) zone = 'right';
+          }
+          post({ type: 'tap', zone: zone });
+        },
+        true,
+      );
     } catch (e) {}
   }
 
@@ -316,6 +375,15 @@
       if (text && text.trim().length) {
         suppressTapUntil = Date.now() + 400;
         post({ type: 'selection', text: text.trim(), cfiRange: '' });
+        // Collapse selection so the OS selection menu doesn't sit over the sheet,
+        // unless the user enabled the native menu.
+        if (!allowNativeMenu) {
+          setTimeout(function () {
+            try {
+              window.getSelection().removeAllRanges();
+            } catch (e) {}
+          }, 0);
+        }
       }
     }, 250);
   }
@@ -473,7 +541,22 @@
     viewer.appendChild(article);
     reflowEl = viewer;
 
-    viewer.addEventListener('click', function () {
+    viewer.addEventListener('click', function (ev) {
+      var a = closestAnchor(ev.target);
+      if (a) {
+        var href = a.getAttribute('href') || '';
+        if (href.charAt(0) === '#') {
+          // In-document anchor (e.g. a built TOC heading link): scroll to it.
+          ev.preventDefault();
+          var el = document.getElementById(href.slice(1));
+          if (el && el.scrollIntoView) el.scrollIntoView();
+        } else if (isExternalHref(href)) {
+          ev.preventDefault();
+          suppressTapUntil = Date.now() + 400;
+          post({ type: 'link', href: href });
+        }
+        return; // a link tap never toggles the reader chrome
+      }
       if (Date.now() < suppressTapUntil) return;
       post({ type: 'tap', zone: 'center' });
     });
@@ -535,6 +618,7 @@
           try {
             if (rendition && rendition.resize) rendition.resize();
           } catch (e) {}
+          setTimeout(redrawAnnotations, 50);
         });
 
         rendition.on('relocated', function (loc) {
@@ -557,11 +641,23 @@
           if (text && text.trim().length) {
             suppressTapUntil = Date.now() + 400;
             post({ type: 'selection', text: text.trim(), cfiRange: cfiRange });
+            // We've captured text + CFI; unless the user opted into the OS
+            // copy/paste/share menu, collapse the DOM selection so it doesn't
+            // pop over our sheet.
+            if (!allowNativeMenu) {
+              setTimeout(function () {
+                try {
+                  contents.window.getSelection().removeAllRanges();
+                } catch (e) {}
+              }, 0);
+            }
           }
         });
 
         rendition.on('rendered', function (section, view) {
           if (view && view.contents) wireContents(view.contents);
+          // Re-place highlight overlays whenever a section (re)renders.
+          redrawAnnotations();
         });
 
         rendition.hooks.content.register(function (contents) {
@@ -576,6 +672,13 @@
             } catch (e2) {}
           }
           wireContents(contents);
+          // Web fonts load async; when they swap in, the text reflows and any
+          // highlight drawn beforehand ends up misaligned. Redraw once fonts settle.
+          try {
+            if (contents.document.fonts && contents.document.fonts.ready) {
+              contents.document.fonts.ready.then(redrawAnnotations);
+            }
+          } catch (e3) {}
         });
 
         var startAt = location || undefined;
@@ -637,6 +740,8 @@
         rendition.themes.register('rp', rules);
         rendition.themes.select('rp');
         document.body.style.background = theme.background;
+        // Selecting a theme reflows the page, so highlight overlays must be redrawn.
+        redrawAnnotations();
       } catch (e) {
         err(e);
       }
@@ -691,16 +796,35 @@
 
     addHighlight: function (id, cfiRange, color) {
       if (!rendition) return;
+      // Idempotent: if this id is already drawn (e.g. a re-sync after load),
+      // remove the old mark first so we never stack duplicate overlays.
+      if (hlCfi[id]) {
+        try {
+          rendition.annotations.remove(hlCfi[id], 'highlight');
+        } catch (e0) {}
+      }
+      hlCfi[id] = cfiRange;
       try {
         // multiply darkens nicely over a light page but turns invisible on a
         // dark one; screen lightens so the marker shows on dark/twilight.
         var dark =
           lastTheme && (lastTheme.key === 'dark' || lastTheme.key === 'twilight');
-        rendition.annotations.highlight(cfiRange, { id: id }, function () {}, 'hl-' + id, {
-          fill: color,
-          'fill-opacity': dark ? '0.45' : '0.35',
-          'mix-blend-mode': dark ? 'screen' : 'multiply',
-        });
+        rendition.annotations.highlight(
+          cfiRange,
+          { id: id },
+          function () {
+            // Tapping a highlight opens the sheet to recolor/delete it.
+            suppressTapUntil = Date.now() + 400;
+            post({ type: 'highlightTapped', id: id, cfiRange: cfiRange });
+          },
+          'hl-' + id,
+          {
+            fill: color,
+            'fill-opacity': dark ? '0.45' : '0.35',
+            'mix-blend-mode': dark ? 'screen' : 'multiply',
+          },
+        );
+        redrawAnnotations();
       } catch (e) {
         err(e);
       }
@@ -708,7 +832,10 @@
     removeHighlight: function (id) {
       if (!rendition) return;
       try {
-        rendition.annotations.remove(id, 'highlight');
+        // epub.js keys annotations by CFI, not our id — look it up.
+        var cfi = hlCfi[id];
+        if (cfi) rendition.annotations.remove(cfi, 'highlight');
+        delete hlCfi[id];
       } catch (e) {}
     },
     renderHighlights: function (items) {
@@ -716,6 +843,20 @@
       items.forEach(function (h) {
         window.RP.addHighlight(h.id, h.cfiRange, h.color);
       });
+    },
+    clearAllHighlights: function () {
+      try {
+        Object.keys(hlCfi).forEach(function (id) {
+          try {
+            rendition.annotations.remove(hlCfi[id], 'highlight');
+          } catch (e) {}
+        });
+      } catch (e) {}
+      hlCfi = {};
+      redrawAnnotations();
+    },
+    setNativeMenu: function (enabled) {
+      allowNativeMenu = !!enabled;
     },
 
     search: function (query) {
@@ -753,6 +894,146 @@
       } catch (e) {}
       post({ type: 'selectionCleared' });
     },
+  };
+
+  // ---------- in-document find (EPUB / PDF / reflow) ----------
+  var find = { q: '', list: [], idx: -1 };
+
+  function postFind() {
+    post({ type: 'findResults', query: find.q, count: find.list.length, index: find.idx });
+  }
+
+  function findGoto() {
+    if (find.idx < 0 || !find.list.length) return;
+    var t = find.list[find.idx];
+    if (mode === 'epub' && rendition) rendition.display(t);
+    else if (mode === 'pdf') scrollToPdfPage(t);
+  }
+
+  function epubFind(q) {
+    if (!book) {
+      find = { q: q, list: [], idx: -1 };
+      postFind();
+      return;
+    }
+    Promise.all(
+      book.spine.spineItems.map(function (item) {
+        return item
+          .load(book.load.bind(book))
+          .then(function () {
+            var res = item.find(q) || [];
+            item.unload();
+            return res;
+          })
+          .catch(function () {
+            return [];
+          });
+      }),
+    ).then(function (results) {
+      var flat = [].concat.apply([], results);
+      find.q = q;
+      find.list = flat.map(function (r) {
+        return r.cfi;
+      });
+      find.idx = flat.length ? 0 : -1;
+      postFind();
+      findGoto();
+    });
+  }
+
+  function pdfFind(q) {
+    if (!pdf.doc) {
+      find = { q: q, list: [], idx: -1 };
+      postFind();
+      return;
+    }
+    var ql = q.toLowerCase();
+    var pages = [];
+    var i = 1;
+    function step() {
+      if (i > pdf.total) {
+        find.q = q;
+        find.list = pages;
+        find.idx = pages.length ? 0 : -1;
+        postFind();
+        findGoto();
+        return;
+      }
+      var pageNo = i;
+      pdf.doc
+        .getPage(pageNo)
+        .then(function (p) {
+          return p.getTextContent();
+        })
+        .then(function (tc) {
+          var s = tc.items
+            .map(function (it) {
+              return it.str;
+            })
+            .join(' ')
+            .toLowerCase();
+          if (s.indexOf(ql) !== -1) pages.push(pageNo);
+          i = pageNo + 1;
+          step();
+        })
+        .catch(function () {
+          i = pageNo + 1;
+          step();
+        });
+    }
+    step();
+  }
+
+  function reflowFind(q) {
+    find = { q: q, list: [], idx: -1 };
+    var ok = false;
+    try {
+      window.getSelection().removeAllRanges();
+      ok = window.find(q, false, false, true);
+    } catch (e) {}
+    post({ type: 'findResults', query: q, count: ok ? 1 : 0, index: ok ? 0 : -1 });
+  }
+
+  window.RP.findInDoc = function (q) {
+    q = (q || '').trim();
+    if (!q) {
+      find = { q: '', list: [], idx: -1 };
+      postFind();
+      return;
+    }
+    if (mode === 'epub') return epubFind(q);
+    if (mode === 'pdf') return pdfFind(q);
+    if (mode === 'reflow') return reflowFind(q);
+  };
+  window.RP.findNext = function () {
+    if (mode === 'reflow') {
+      try {
+        window.find(find.q, false, false, true);
+      } catch (e) {}
+      return;
+    }
+    if (!find.list.length) return;
+    find.idx = (find.idx + 1) % find.list.length;
+    findGoto();
+    postFind();
+  };
+  window.RP.findPrev = function () {
+    if (mode === 'reflow') {
+      try {
+        window.find(find.q, false, true, true);
+      } catch (e) {}
+      return;
+    }
+    if (!find.list.length) return;
+    find.idx = (find.idx - 1 + find.list.length) % find.list.length;
+    findGoto();
+    postFind();
+  };
+  window.RP.clearFind = function () {
+    find = { q: '', list: [], idx: -1 };
+    try {
+      window.getSelection().removeAllRanges();
+    } catch (e) {}
   };
 
   post({ type: 'ready' });

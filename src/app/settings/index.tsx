@@ -1,3 +1,4 @@
+import Slider from '@react-native-community/slider';
 import Constants from 'expo-constants';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
@@ -18,8 +19,6 @@ export default function SettingsScreen() {
 
   const searchLabel =
     s.searchEngine === 'disabled' ? 'Disabled' : SEARCH_ENGINES[s.searchEngine].label;
-  const triggerLabel =
-    s.bottomSheetTrigger === 'tap' ? 'Tap a word' : 'On selection only';
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.colors.background }]}>
@@ -77,26 +76,6 @@ export default function SettingsScreen() {
           )}
         />
 
-        {s.bottomSheetEnabled && (
-          <View style={styles.indent}>
-            <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>
-              When does it open?
-            </Text>
-            <SegmentedButtons
-              value={s.bottomSheetTrigger}
-              onValueChange={(v) => s.set('bottomSheetTrigger', v as typeof s.bottomSheetTrigger)}
-              style={styles.segmentInline}
-              buttons={[
-                { value: 'selection', label: 'On selection' },
-                { value: 'tap', label: 'Tap a word' },
-              ]}
-            />
-            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-              Scrolling never opens the sheet.
-            </Text>
-          </View>
-        )}
-
         <List.Item
           title="Search engine"
           description={searchLabel}
@@ -120,6 +99,57 @@ export default function SettingsScreen() {
           />
           <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
             Where result links open: a mini browser inside revpdf, or your phone’s browser.
+          </Text>
+        </View>
+
+        <List.Item
+          title="Native selection menu"
+          description="Also show Android’s copy / share menu when you select text"
+          left={(p) => <List.Icon {...p} icon="content-copy" />}
+          right={() => (
+            <Switch
+              value={s.nativeSelectionMenu}
+              onValueChange={(v) => s.set('nativeSelectionMenu', v)}
+            />
+          )}
+        />
+
+        <View style={styles.indent}>
+          <View style={styles.peekHeader}>
+            <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>
+              Selection sheet height
+            </Text>
+            <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>
+              {s.selectionPeekHeight}px
+            </Text>
+          </View>
+          <Slider
+            minimumValue={120}
+            maximumValue={360}
+            step={4}
+            value={s.selectionPeekHeight}
+            onValueChange={(v) => s.set('selectionPeekHeight', Math.round(v))}
+            minimumTrackTintColor={theme.colors.primary}
+            maximumTrackTintColor={theme.colors.surfaceVariant}
+            thumbTintColor={theme.colors.primary}
+          />
+          {/* Realtime preview: a mock sheet at the chosen peek height. */}
+          <View
+            style={[
+              styles.peekPreview,
+              {
+                height: Math.min(s.selectionPeekHeight, 240),
+                backgroundColor: theme.colors.surfaceVariant,
+              },
+            ]}>
+            <View style={[styles.peekHandle, { backgroundColor: theme.colors.onSurfaceVariant }]} />
+            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+              “Selected text” — colors &amp; search results appear here
+            </Text>
+          </View>
+          <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+            How much of the selection sheet shows when you select text. Drag its handle higher (up to
+            half the screen) for more.
           </Text>
         </View>
 
@@ -193,6 +223,23 @@ const styles = StyleSheet.create({
   segmentWrap: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   segmentInline: { marginVertical: spacing.sm },
   indent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: 4 },
+  peekHeader: { flexDirection: 'row', justifyContent: 'space-between' },
+  peekPreview: {
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    marginTop: spacing.xs,
+    overflow: 'hidden',
+  },
+  peekHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    alignSelf: 'center',
+    opacity: 0.6,
+    marginBottom: spacing.sm,
+  },
   aboutLogo: { alignItems: 'center', paddingTop: spacing.lg, paddingBottom: spacing.xs },
   logo: { width: 168, height: 57 },
   builtBy: { textAlign: 'center', marginTop: spacing.lg },

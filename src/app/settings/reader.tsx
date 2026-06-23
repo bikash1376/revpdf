@@ -1,9 +1,23 @@
 import Slider from '@react-native-community/slider';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { Platform, ScrollView, StyleSheet, View } from 'react-native';
-import { Appbar, Chip, Divider, List, SegmentedButtons, Switch, Text, useTheme } from 'react-native-paper';
+import {
+  Appbar,
+  Button,
+  Chip,
+  Dialog,
+  Divider,
+  List,
+  Portal,
+  SegmentedButtons,
+  Switch,
+  Text,
+  useTheme,
+} from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { clearHighlights, countHighlights } from '@/db';
 import { useSettings } from '@/store/settings';
 import { readerSurfaces, readingFonts, spacing, type ReadingFontKey } from '@/theme/tokens';
 
@@ -21,8 +35,22 @@ export default function ReaderSettingsScreen() {
   // When opened from inside a PDF, font face/size don't apply (fixed layout) —
   // fade those controls out. Reflowable formats (and the global entry from
   // Settings, where no format is passed) keep them active.
-  const { format } = useLocalSearchParams<{ format?: string }>();
+  const { format, id } = useLocalSearchParams<{ format?: string; id?: string }>();
   const isPdf = format === 'pdf';
+
+  // Highlight management is per-document, so it only shows when this screen was
+  // opened from inside a reader (an `id` was passed).
+  const [hlCount, setHlCount] = useState<number | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
+  useEffect(() => {
+    if (id) countHighlights(id).then(setHlCount).catch(() => setHlCount(0));
+  }, [id]);
+
+  const doClearAll = async () => {
+    if (id) await clearHighlights(id);
+    setHlCount(0);
+    setConfirmClear(false);
+  };
 
   const previewFontFamily =
     s.fontFamily === 'original'
@@ -176,7 +204,44 @@ export default function ReaderSettingsScreen() {
             onChange={(v) => s.set('brightness', v / 100)}
           />
         )}
+
+        {id ? (
+          <>
+            <Divider style={{ marginVertical: spacing.sm }} />
+            <List.Subheader>Highlights</List.Subheader>
+            <List.Item
+              title="Clear all highlights"
+              description={
+                hlCount === null
+                  ? 'Loading…'
+                  : hlCount === 0
+                    ? 'No highlights in this document'
+                    : `Remove all ${hlCount} highlight${hlCount === 1 ? '' : 's'} from this document`
+              }
+              left={(p) => <List.Icon {...p} icon="marker-cancel" />}
+              disabled={!hlCount}
+              onPress={() => setConfirmClear(true)}
+            />
+          </>
+        ) : null}
       </ScrollView>
+
+      <Portal>
+        <Dialog visible={confirmClear} onDismiss={() => setConfirmClear(false)}>
+          <Dialog.Title>Clear all highlights?</Dialog.Title>
+          <Dialog.Content>
+            <Text variant="bodyMedium">
+              This permanently removes every highlight in this document. This can’t be undone.
+            </Text>
+          </Dialog.Content>
+          <Dialog.Actions>
+            <Button onPress={() => setConfirmClear(false)}>Cancel</Button>
+            <Button textColor={theme.colors.error} onPress={doClearAll}>
+              Clear all
+            </Button>
+          </Dialog.Actions>
+        </Dialog>
+      </Portal>
     </View>
   );
 }
