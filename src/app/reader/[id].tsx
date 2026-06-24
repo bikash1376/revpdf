@@ -290,7 +290,7 @@ export default function ReaderScreen() {
         </View>
       )}
 
-      {chrome && (
+      {chrome && !selection && (
         <View
           style={[styles.bottomBar, { paddingBottom: insets.bottom, backgroundColor: theme.colors.surface }]}
           pointerEvents="box-none">
