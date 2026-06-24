@@ -8,8 +8,29 @@ search** sheet.
 Everything stays on the device. No accounts, no servers, no cloud.
 
 - Website: [revpdf.in](https://revpdf.in) · [Terms](https://revpdf.in/terms) · [Privacy](https://revpdf.in/privacy)
-- Full design & technical spec: [`SPEC.md`](./SPEC.md)
-- Progress tracker: [`PHASES.md`](./PHASES.md)
+
+## Screenshots
+
+<p align="center">
+  <img src="web/public/screenshots/screen-1.jpeg" width="24%" alt="Library" />
+  <img src="web/public/screenshots/screen-2.jpeg" width="24%" alt="Reader" />
+  <img src="web/public/screenshots/screen-3.jpeg" width="24%" alt="Highlighting" />
+  <img src="web/public/screenshots/screen-4.jpeg" width="24%" alt="Selection search" />
+</p>
+<p align="center">
+  <img src="web/public/screenshots/screen-5.jpeg" width="24%" alt="Reader settings" />
+  <img src="web/public/screenshots/screen-6.jpeg" width="24%" alt="About document" />
+  <img src="web/public/screenshots/screen-1.gif" width="24%" alt="Demo" />
+</p>
+
+**Reading themes**
+
+<p align="center">
+  <img src="web/public/screenshots/light.png" width="24%" alt="Light" />
+  <img src="web/public/screenshots/dark.png" width="24%" alt="Dark" />
+  <img src="web/public/screenshots/sepia.png" width="24%" alt="Sepia" />
+  <img src="web/public/screenshots/twilight.png" width="24%" alt="Twilight" />
+</p>
 
 ## Features
 
@@ -66,6 +87,4 @@ src/
   theme/               design tokens + MD3 themes
   lib/                 small helpers
 ref/                   reference screenshots
-SPEC.md                product & technical specification
-PHASES.md              milestone progress
 ```

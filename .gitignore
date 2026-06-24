@@ -52,3 +52,11 @@ ref/
 .astro/
 web/.astro/
 web/dist/
+
+# internal planning / reference docs (not part of the public repo)
+VUL.md
+PLAYSTORE.md
+COMMANDS.md
+PHASES.md
+SPEC.md
+VERSION2.md
