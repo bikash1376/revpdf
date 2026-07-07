@@ -280,8 +280,10 @@ const faqs = [
   .connect-visual {
     aspect-ratio: 1 / 1;
     border-radius: var(--radius-xl);
-    background:
-      radial-gradient(120% 120% at 30% 20%, #eef0f6 0%, #e2e5ee 55%, #d7dae6 100%);
+    background-image: url('/features.jpg');
+    background-size: cover;
+    background-position: center;
+    background-color: #e2e5ee;
     box-shadow: var(--shadow-1);
   }
 
@@ -366,10 +368,10 @@ const faqs = [
     content: '';
     position: absolute;
     inset: 0;
-    background-image: url('https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&w=1600&q=60');
+    background-image: url('/cta.jpg');
     background-size: cover;
     background-position: center;
-    opacity: 0.22;
+    opacity: 0.3;
     z-index: 0;
   }
   .cta-inner::after {
