@@ -8,11 +8,34 @@ const {
   description = 'revpdf is a minimalist offline PDF and EPUB reader for Android. Highlights, reader themes, search and zoom — with no accounts and no servers.',
 } = Astro.props;
 const year = new Date().getFullYear();
-const nav = [
-  { href: '/#features', label: 'Features' },
-  { href: '/#download', label: 'Download' },
-];
+const CONTACT_EMAIL = 'bikash13763@gmail.com';
 const ogImage = new URL('/revpdf.jpeg', Astro.site).href;
+
+const footerCols = [
+  {
+    heading: 'Product',
+    links: [
+      { label: 'Features', href: '/#features' },
+      { label: 'FAQ', href: '/#faq' },
+      { label: 'Download', href: '/#download' },
+    ],
+  },
+  {
+    heading: 'Company',
+    links: [
+      { label: 'Terms of Service', href: '/terms' },
+      { label: 'Privacy Policy', href: '/privacy' },
+      { label: 'Feedback', href: `mailto:${CONTACT_EMAIL}?subject=revpdf%20feedback` },
+    ],
+  },
+  {
+    heading: 'Connect',
+    links: [
+      { label: 'Built by Bikash', href: 'https://bksh.site' },
+      { label: 'Email', href: `mailto:${CONTACT_EMAIL}` },
+    ],
+  },
+];
 ---
 
 <!doctype html>
@@ -33,8 +56,10 @@ const ogImage = new URL('/revpdf.jpeg', Astro.site).href;
     <meta name="twitter:image" content={ogImage} />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Self-hosted Geist + Newsreader (public/fonts) so they always apply. -->
+    <link rel="stylesheet" href="/fonts/fonts.css" />
     <link
-      href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0&display=swap"
       rel="stylesheet"
     />
   </head>
@@ -44,8 +69,9 @@ const ogImage = new URL('/revpdf.jpeg', Astro.site).href;
         <img class="brand-logo" src="/revpdf-logo.png" alt="revpdf" width="621" height="210" />
       </a>
       <nav class="nav">
-        {nav.map((n) => <a href={n.href}>{n.label}</a>)}
-        <a class="btn btn-tonal" href="/#download">Get the app</a>
+        <a href="/#features">Features</a>
+        <a href="/#faq">FAQ</a>
+        <a class="btn btn-dark" href="/#download">Get Started</a>
       </nav>
     </header>
 
@@ -55,16 +81,22 @@ const ogImage = new URL('/revpdf.jpeg', Astro.site).href;
 
     <footer class="footer">
       <div class="footer-inner">
-        <div>
+        <div class="footer-brand">
           <img class="footer-logo" src="/revpdf-logo.png" alt="revpdf" width="621" height="210" />
-          <p class="muted">Everything stays on this device. No accounts, no servers.</p>
+          <p class="muted">A quiet, private reader.<br />Everything stays on your device.</p>
         </div>
-        <nav class="footer-links">
-          <a href="/terms">Terms of Service</a>
-          <a href="/privacy">Privacy Policy</a>
-          <a href="mailto:bikash13763@gmail.com?subject=revpdf%20feedback">Feedback &amp; bug reports</a>
-          <a href="https://bksh.site" target="_blank" rel="noopener">Built by Bikash</a>
-        </nav>
+        <div class="footer-cols">
+          {
+            footerCols.map((col) => (
+              <div class="footer-col">
+                <h4>{col.heading}</h4>
+                {col.links.map((l) => (
+                  <a href={l.href}>{l.label}</a>
+                ))}
+              </div>
+            ))
+          }
+        </div>
       </div>
       <p class="copyright muted">© {year} revpdf · revpdf.in</p>
     </footer>
@@ -73,30 +105,24 @@ const ogImage = new URL('/revpdf.jpeg', Astro.site).href;
 
 <style is:global>
   :root {
-    /* MD3 ink-indigo tokens, mirrored from the app's theme. */
-    --primary: #3f51b5;
-    --primary-bright: #5c6bc0;
-    --primary-deep: #2a3578;
-    --primary-container: #dee1ff;
-    --on-primary: #ffffff;
-    --on-primary-container: #2a3578;
-
-    --background: #fbfbfe;
+    --bg: #fbfaf8;
     --surface: #ffffff;
-    --surface-variant: #eeeef3;
-    --on-surface: #1b1b1f;
-    --on-surface-variant: #5b5d66;
-    --outline: #c9cad2;
+    --ink: #14213d;
+    --ink-soft: #1f2d4d;
+    --body: #4a5568;
+    --muted: #6b7280;
+    --line: #e8e7e2;
+    --card: #f2f3f5;
+    --dark: #0e1526;
+    --dark-2: #080d18;
+    --accent: #3f51b5;
 
-    /* a hint of the reader's sepia + twilight, used as accents */
-    --sepia: #f4ecd8;
-    --twilight: #1b2330;
-
-    --radius-sm: 12px;
+    --radius-sm: 14px;
     --radius-lg: 28px;
-    --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.06), 0 1px 3px rgba(0, 0, 0, 0.1);
-    --shadow-2: 0 4px 12px rgba(31, 33, 56, 0.12);
-    --maxw: 1080px;
+    --radius-xl: 36px;
+    --shadow-1: 0 1px 2px rgba(20, 33, 61, 0.06), 0 1px 3px rgba(20, 33, 61, 0.08);
+    --shadow-2: 0 12px 40px rgba(20, 33, 61, 0.14);
+    --maxw: 1120px;
   }
 
   * {
@@ -107,31 +133,43 @@ const ogImage = new URL('/revpdf.jpeg', Astro.site).href;
   }
   body {
     margin: 0;
-    font-family: 'Roboto', system-ui, -apple-system, sans-serif;
-    color: var(--on-surface);
-    background: var(--background);
+    font-family: 'Geist', system-ui, -apple-system, sans-serif;
+    color: var(--body);
+    background: var(--bg);
     line-height: 1.6;
     -webkit-font-smoothing: antialiased;
   }
   h1,
-  h2,
-  h3 {
-    line-height: 1.15;
-    letter-spacing: -0.01em;
+  h2 {
+    font-family: 'Newsreader', Georgia, serif;
+    color: var(--ink);
+    font-weight: 500;
+    line-height: 1.08;
+    letter-spacing: -0.015em;
+    margin: 0 0 0.4em;
+  }
+  h3,
+  h4 {
+    color: var(--ink);
+    line-height: 1.25;
     margin: 0 0 0.4em;
   }
   p {
     margin: 0 0 1em;
   }
   a {
-    color: var(--primary);
+    color: var(--accent);
     text-decoration: none;
   }
   a:hover {
     text-decoration: underline;
   }
   .muted {
-    color: var(--on-surface-variant);
+    color: var(--muted);
+  }
+  .lead {
+    font-size: clamp(17px, 2.2vw, 20px);
+    color: var(--body);
   }
   .material-symbols-outlined {
     font-family: 'Material Symbols Outlined';
@@ -146,22 +184,18 @@ const ogImage = new URL('/revpdf.jpeg', Astro.site).href;
   .topbar {
     position: sticky;
     top: 0;
-    z-index: 10;
+    z-index: 20;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    padding: 14px clamp(16px, 5vw, 40px);
-    background: rgba(251, 251, 254, 0.8);
-    backdrop-filter: saturate(180%) blur(12px);
-    border-bottom: 1px solid var(--outline);
+    padding: 16px clamp(16px, 5vw, 44px);
+    background: rgba(251, 250, 248, 0.82);
+    backdrop-filter: saturate(180%) blur(14px);
   }
   .brand {
     display: inline-flex;
     align-items: center;
-    gap: 10px;
-    color: var(--on-surface);
-    font-weight: 700;
   }
   .brand:hover {
     text-decoration: none;
@@ -171,27 +205,18 @@ const ogImage = new URL('/revpdf.jpeg', Astro.site).href;
     width: auto;
     display: block;
   }
-  .footer-logo {
-    height: 34px;
-    width: auto;
-    display: block;
-    margin-bottom: 4px;
-  }
-  .brand-name {
-    font-size: 20px;
-    font-weight: 700;
-  }
   .nav {
     display: flex;
     align-items: center;
-    gap: clamp(12px, 3vw, 28px);
+    gap: clamp(14px, 3vw, 32px);
   }
-  .nav > a {
-    color: var(--on-surface-variant);
+  .nav > a:not(.btn) {
+    color: var(--ink-soft);
     font-weight: 500;
+    font-size: 15px;
   }
-  .nav > a:hover {
-    color: var(--on-surface);
+  .nav > a:not(.btn):hover {
+    color: var(--ink);
     text-decoration: none;
   }
 
@@ -199,36 +224,63 @@ const ogImage = new URL('/revpdf.jpeg', Astro.site).href;
   .btn {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 12px 22px;
+    justify-content: center;
+    gap: 9px;
+    padding: 13px 24px;
     border-radius: 999px;
-    font-weight: 500;
+    font-family: 'Geist', sans-serif;
+    font-weight: 600;
     font-size: 15px;
     border: none;
     cursor: pointer;
     transition:
-      box-shadow 0.2s,
-      filter 0.2s,
-      background 0.2s;
+      transform 0.18s ease,
+      box-shadow 0.2s ease,
+      filter 0.2s ease,
+      background 0.2s ease;
   }
   .btn:hover {
     text-decoration: none;
   }
-  .btn-filled {
-    background: var(--primary);
-    color: var(--on-primary);
+  .btn .material-symbols-outlined {
+    font-size: 20px;
+  }
+  .btn-dark {
+    background: var(--dark);
+    color: #fff;
     box-shadow: var(--shadow-1);
   }
-  .btn-filled:hover {
-    filter: brightness(1.07);
+  .btn-dark:hover {
+    transform: translateY(-1px);
     box-shadow: var(--shadow-2);
   }
-  .btn-tonal {
-    background: var(--primary-container);
-    color: var(--on-primary-container);
+  .btn-light {
+    background: #fff;
+    color: var(--dark);
+    box-shadow: var(--shadow-1);
   }
-  .btn-tonal:hover {
-    filter: brightness(0.98);
+  .btn-light:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-2);
+  }
+  /* frosted-glass button (hero) */
+  .btn-glass {
+    background: rgba(255, 255, 255, 0.5);
+    color: var(--ink);
+    border: 1px solid rgba(20, 33, 61, 0.12);
+    backdrop-filter: saturate(160%) blur(10px);
+    -webkit-backdrop-filter: saturate(160%) blur(10px);
+    box-shadow: 0 1px 2px rgba(20, 33, 61, 0.05);
+  }
+  .btn-glass:hover {
+    background: rgba(255, 255, 255, 0.72);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-1);
+  }
+  /* compact button in the navbar */
+  .nav .btn {
+    padding: 9px 18px;
+    font-size: 14px;
   }
 
   /* ---- layout helpers ---- */
@@ -238,60 +290,82 @@ const ogImage = new URL('/revpdf.jpeg', Astro.site).href;
   .section {
     max-width: var(--maxw);
     margin: 0 auto;
-    padding: clamp(48px, 8vw, 96px) clamp(16px, 5vw, 40px);
+    padding: clamp(44px, 6vw, 84px) clamp(16px, 5vw, 44px);
   }
 
   /* ---- footer ---- */
   .footer {
-    border-top: 1px solid var(--outline);
-    background: var(--surface);
-    margin-top: 48px;
+    border-top: 1px solid var(--line);
+    background: var(--bg);
+    margin-top: 8px;
   }
   .footer-inner {
     max-width: var(--maxw);
     margin: 0 auto;
-    padding: 40px clamp(16px, 5vw, 40px) 8px;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 24px;
-    justify-content: space-between;
+    padding: clamp(40px, 6vw, 64px) clamp(16px, 5vw, 44px) 20px;
+    display: grid;
+    grid-template-columns: 1fr 1.6fr;
+    gap: clamp(28px, 5vw, 64px);
   }
-  .footer-inner p {
-    margin: 6px 0 0;
-    max-width: 320px;
+  .footer-logo {
+    height: 28px;
+    width: auto;
+    display: block;
+    margin-bottom: 12px;
   }
-  .footer-links {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+  .footer-brand p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.6;
+    max-width: 240px;
   }
-  .footer-links a {
-    color: var(--on-surface-variant);
+  .footer-cols {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+  }
+  .footer-col h4 {
+    font-family: 'Newsreader', Georgia, serif;
+    font-size: 17px;
     font-weight: 500;
+    margin-bottom: 14px;
+  }
+  .footer-col a {
+    display: block;
+    color: var(--muted);
+    font-size: 14px;
+    margin-bottom: 11px;
+  }
+  .footer-col a:hover {
+    color: var(--ink);
+    text-decoration: none;
   }
   .copyright {
     text-align: center;
-    font-size: 14px;
-    padding: 16px;
+    font-size: 13px;
+    padding: 14px;
     margin: 0;
+    border-top: 1px solid var(--line);
   }
 
   /* ---- responsive ---- */
+  @media (max-width: 720px) {
+    .footer-inner {
+      grid-template-columns: 1fr;
+    }
+  }
   @media (max-width: 600px) {
     .topbar {
       padding: 12px 16px;
     }
-    /* keep the brand + primary CTA; drop the inline text links to avoid crowding */
+    .nav {
+      gap: 14px;
+    }
     .nav > a:not(.btn) {
       display: none;
     }
-    .btn {
-      padding: 11px 18px;
-      font-size: 14px;
-    }
-    .footer-inner {
-      flex-direction: column;
-      gap: 16px;
+    .footer-cols {
+      grid-template-columns: repeat(2, 1fr);
     }
   }
 </style>
