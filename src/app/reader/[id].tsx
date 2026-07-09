@@ -17,7 +17,7 @@ import {
   updateProgress,
   type DocumentRow,
 } from '@/db';
-import type { OutboundMessage, TocItem } from '@/reader/bridge';
+import { isSafeExternalHref, type OutboundMessage, type TocItem } from '@/reader/bridge';
 import { useSettings } from '@/store/settings';
 import { readerSurfaces } from '@/theme/tokens';
 
@@ -94,8 +94,11 @@ export default function ReaderScreen() {
         setChrome((v) => !v);
         break;
       case 'link': {
-        // A hyperlink tapped inside the document. mailto:/tel: always go to the
-        // OS handler; http(s) honors the "Open links in" setting.
+        // A hyperlink tapped inside the document. Re-validate the scheme
+        // natively (never trust the WebView) before handing it to the OS:
+        // mailto:/tel: always go to the OS handler; http(s) honors the
+        // "Open links in" setting.
+        if (!isSafeExternalHref(msg.href)) break;
         const useSystem =
           settings.openLinksIn === 'external' || /^(mailto:|tel:)/i.test(msg.href);
         if (useSystem) Linking.openURL(msg.href).catch(() => {});

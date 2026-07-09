@@ -241,7 +241,9 @@
     document.addEventListener('selectionchange', onPdfSelectionChange);
 
     pdfjsLib
-      .getDocument({ data: new Uint8Array(buffer) })
+      // isEvalSupported:false disables the font/JS eval path abused by
+      // CVE-2024-4367 (arbitrary JS execution from a crafted PDF).
+      .getDocument({ data: new Uint8Array(buffer), isEvalSupported: false })
       .promise.then(function (doc) {
         pdf.doc = doc;
         pdf.total = doc.numPages;
@@ -404,6 +406,28 @@
     return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  // Untrusted document HTML (Markdown output and raw .html files) is run through
+  // DOMPurify before it ever touches innerHTML, so embedded <script>, inline
+  // event handlers (onerror/onload/...), javascript: URLs and other XSS vectors
+  // are stripped while ordinary formatting is preserved. If the sanitizer failed
+  // to load we fail closed and render the markup as escaped text rather than
+  // injecting it raw.
+  function sanitizeHtml(html) {
+    try {
+      if (window.DOMPurify && window.DOMPurify.sanitize) {
+        // Default DOMPurify is already XSS-safe; we additionally drop the
+        // script/navigation-capable containers (iframe/object/embed/form) as
+        // defence in depth. Inline styles are kept so document formatting still
+        // renders faithfully — CSP blocks any network egress they could attempt.
+        return window.DOMPurify.sanitize(String(html), {
+          USE_PROFILES: { html: true },
+          FORBID_TAGS: ['iframe', 'object', 'embed', 'form'],
+        });
+      }
+    } catch (e) {}
+    return '<pre>' + escapeHtml(html) + '</pre>';
+  }
+
   function csvToHtml(text) {
     var rows = [];
     var row = [];
@@ -452,7 +476,9 @@
   function formatToHtml(text, format) {
     if (format === 'md') {
       try {
-        return window.marked ? window.marked.parse(text) : '<pre>' + escapeHtml(text) + '</pre>';
+        return window.marked
+          ? sanitizeHtml(window.marked.parse(text))
+          : '<pre>' + escapeHtml(text) + '</pre>';
       } catch (e) {
         return '<pre>' + escapeHtml(text) + '</pre>';
       }
@@ -465,7 +491,7 @@
       }
     }
     if (format === 'csv') return csvToHtml(text);
-    if (format === 'html') return String(text).replace(/<script[\s\S]*?<\/script>/gi, '');
+    if (format === 'html') return sanitizeHtml(text);
     return text
       .split(/\n{2,}/)
       .map(function (p) {
@@ -610,7 +636,9 @@
           flow: epubFlow,
           spread: 'none',
           snap: epubFlow === 'paginated',
-          allowScriptedContent: true,
+          // EPUB chapters are attacker-supplied (X)HTML; never let their inline
+          // scripts run in the chapter iframe.
+          allowScriptedContent: false,
         });
 
         // Re-layout on orientation / viewport changes so pagination stays sane.

@@ -7,6 +7,7 @@
     "@gorhom/bottom-sheet": "^5.2.14",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/slider": "5.0.1",
+    "dompurify": "^3.4.11",
     "epubjs": "^0.3.93",
     "expo": "~54.0.0",
     "expo-brightness": "~14.0.8",
@@ -41,6 +42,8 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~10.0.0",
     "typescript": "~5.9.2"
   },
   "scripts": {

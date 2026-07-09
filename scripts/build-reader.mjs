@@ -31,13 +31,39 @@ const epub = read('node_modules/epubjs/dist/epub.min.js');
 const pdf = read('node_modules/pdfjs-dist/build/pdf.min.js');
 const pdfWorker = read('node_modules/pdfjs-dist/build/pdf.worker.min.js');
 const marked = read('node_modules/marked/marked.min.js');
+const purify = read('node_modules/dompurify/dist/purify.min.js');
 const css = read('src/reader-web/reader.css');
 const controller = read('src/reader-web/controller.js');
+
+// Content-Security-Policy for the reader document. Everything the reader needs
+// is inlined or generated in-process (inline scripts/styles, data: fonts, blob:
+// PDF worker, blob: EPUB section iframes/images), so we allow exactly those and
+// nothing else. Crucially there is no external host in any fetch/connect/img
+// directive, which removes the network-egress channel an injected script would
+// need to exfiltrate a document's contents.
+const csp = [
+  "default-src 'none'",
+  "base-uri 'none'",
+  "form-action 'none'",
+  "script-src 'unsafe-inline' blob:",
+  "worker-src blob:",
+  "child-src blob:",
+  "frame-src 'self' blob: data:",
+  // epub.js rewrites chapter stylesheets/fonts to blob: URLs, so blob: must be
+  // allowed here or EPUB styling/fonts break. blob:/data: are same-origin
+  // generated content, not an external-egress channel.
+  "style-src 'unsafe-inline' blob:",
+  "img-src 'self' data: blob:",
+  "font-src data: blob:",
+  "media-src 'self' data: blob:",
+  "connect-src 'self' blob: data:",
+].join('; ');
 
 const html = `<!doctype html>
 <html>
 <head>
 <meta charset="utf-8" />
+<meta http-equiv="Content-Security-Policy" content="${csp}" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 <style>${css}</style>
 </head>
@@ -47,6 +73,7 @@ const html = `<!doctype html>
 <script>${epub}</script>
 <script>${pdf}</script>
 <script>${marked}</script>
+<script>${purify}</script>
 <script>window.__PDF_WORKER_SRC__ = ${JSON.stringify(pdfWorker)};</script>
 <script>window.__READER_FONTS_CSS__ = ${JSON.stringify(fontFaces)};</script>
 <script>${controller}</script>
