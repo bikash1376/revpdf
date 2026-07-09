@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SEARCH_ENGINES, useSettings } from '@/store/settings';
 import { spacing } from '@/theme/tokens';
+import { wordmark } from '@/theme/wordmark';
 
 const SITE = 'https://revpdf.in';
 
@@ -168,11 +169,7 @@ export default function SettingsScreen() {
 
         <Divider />
         <View style={styles.aboutLogo}>
-          <Image
-            source={require('@/assets/images/revpdf-logo.png')}
-            style={styles.logo}
-            contentFit="contain"
-          />
+          <Image source={wordmark(theme.dark)} style={styles.logo} contentFit="contain" />
         </View>
         <List.Subheader>About</List.Subheader>
         <List.Item
@@ -241,7 +238,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   aboutLogo: { alignItems: 'center', paddingTop: spacing.lg, paddingBottom: spacing.xs },
-  logo: { width: 168, height: 57 },
+  logo: { width: 168, height: 45 },
   builtBy: { textAlign: 'center', marginTop: spacing.lg },
   footer: { textAlign: 'center', marginTop: spacing.sm, paddingHorizontal: spacing.lg },
 });

@@ -4,14 +4,13 @@
     "slug": "revpdf",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/RevPdf.png",
     "scheme": "revpdf",
     "userInterfaceStyle": "automatic",
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#FFFFFF",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
+        "backgroundColor": "#000000",
+        "foregroundImage": "./assets/RevPdf.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
@@ -26,12 +25,12 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#FFFFFF",
-          "image": "./assets/images/revpdf-logo.png",
+          "backgroundColor": "#000000",
+          "image": "./assets/images/revpdf-wordmark-inverse.png",
           "imageWidth": 240,
           "android": {
-            "backgroundColor": "#FFFFFF",
-            "image": "./assets/images/revpdf-logo.png",
+            "backgroundColor": "#000000",
+            "image": "./assets/images/revpdf-wordmark-inverse.png",
             "imageWidth": 240
           }
         }

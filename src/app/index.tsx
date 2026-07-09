@@ -19,6 +19,7 @@ import { DocumentListItem } from '@/components/DocumentListItem';
 import type { DocumentRow } from '@/db';
 import { useLibrary } from '@/store/library';
 import { spacing } from '@/theme/tokens';
+import { wordmark } from '@/theme/wordmark';
 
 export default function LibraryScreen() {
   const theme = useTheme();
@@ -114,11 +115,7 @@ export default function LibraryScreen() {
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
-            <Image
-              source={require('@/assets/images/revpdf-logo.png')}
-              style={styles.emptyLogo}
-              contentFit="contain"
-            />
+            <Image source={wordmark(theme.dark)} style={styles.emptyLogo} contentFit="contain" />
             <Text variant="titleMedium" style={{ color: theme.colors.onSurface }}>
               Your library is empty
             </Text>
@@ -193,7 +190,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     padding: spacing.xl,
   },
-  emptyLogo: { width: 200, height: 68, marginBottom: spacing.md },
+  emptyLogo: { width: 200, height: 53, marginBottom: spacing.md },
   emptySub: { textAlign: 'center', marginBottom: spacing.sm },
   fab: { position: 'absolute', right: spacing.md },
 });
