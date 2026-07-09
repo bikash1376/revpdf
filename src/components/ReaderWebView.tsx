@@ -218,10 +218,11 @@ export const ReaderWebView = forwardRef<ReaderHandle, Props>(function ReaderWebV
         ref={webRef}
         // The reader is fully self-contained (all libraries, fonts and the PDF
         // worker are inlined into `html`), so it needs neither local-file access
-        // nor cross-origin file access, and only ever navigates within its own
-        // base origin. Keeping these off contains any content-level XSS: it
-        // cannot reach the filesystem or navigate the top frame off-origin.
-        originWhitelist={['https://revpdf.local']}
+        // nor cross-origin file access. We whitelist only the base origin plus
+        // the internal blob:/data:/about: schemes epub.js uses for its chapter
+        // iframes and resources — external http(s) origins stay un-whitelisted,
+        // so a content-level XSS can't navigate the WebView off to an attacker.
+        originWhitelist={['https://revpdf.local', 'blob:', 'data:', 'about:']}
         source={{ html, baseUrl: 'https://revpdf.local/' }}
         onMessage={handleMessage}
         style={{ flex: 1, backgroundColor: theme.background }}

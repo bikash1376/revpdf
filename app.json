@@ -4,13 +4,13 @@
     "slug": "revpdf",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/RevPdf.png",
+    "icon": "./assets/AppIcons/appstore.png",
     "scheme": "revpdf",
     "userInterfaceStyle": "automatic",
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#000000",
-        "foregroundImage": "./assets/RevPdf.png",
+        "foregroundImage": "./assets/AppIcons/android-adaptive-foreground.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,

@@ -43,7 +43,11 @@ const controller = read('src/reader-web/controller.js');
 // need to exfiltrate a document's contents.
 const csp = [
   "default-src 'none'",
-  "base-uri 'none'",
+  // 'self' (not 'none'): the WebView's baseUrl gives the document a base of
+  // https://revpdf.local, and epub.js sets a same-origin <base> for relative
+  // resource resolution. 'self' permits that while still blocking an injected
+  // <base> from redirecting relative URLs to an attacker origin.
+  "base-uri 'self'",
   "form-action 'none'",
   "script-src 'unsafe-inline' blob:",
   "worker-src blob:",
