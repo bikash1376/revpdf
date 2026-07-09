@@ -44,6 +44,11 @@ type Props = {
   onMessage?: (msg: OutboundMessage) => void;
 };
 
+// The reader loads a document entirely into memory (base64 → Uint8Array), so an
+// unbounded file can crash the WebView. Cap it at a size comfortably above real
+// books/PDFs but below what OOM-crashes a mid-range device.
+const MAX_DOCUMENT_BYTES = 100 * 1024 * 1024;
+
 function themeFromSettings(name: ReturnType<typeof useSettings.getState>['readerTheme']): ReaderTheme {
   const s = readerSurfaces[name];
   return { key: name, background: s.background, text: s.text, link: s.link };
@@ -157,6 +162,18 @@ export const ReaderWebView = forwardRef<ReaderHandle, Props>(function ReaderWebV
     webRef.current?.injectJavaScript(cmd.applyTheme(theme));
     webRef.current?.injectJavaScript(cmd.applyTypography(typography));
     webRef.current?.injectJavaScript(cmd.setNativeMenu(settings.nativeSelectionMenu));
+    // Guard against loading a document large enough to OOM-crash the WebView:
+    // the whole file is base64-encoded and decoded into memory below.
+    if (doc.size_bytes > MAX_DOCUMENT_BYTES) {
+      onMessage?.({
+        type: 'error',
+        message: `This document is too large to open (limit ${Math.round(
+          MAX_DOCUMENT_BYTES / (1024 * 1024),
+        )} MB).`,
+      });
+      setLoading(false);
+      return;
+    }
     try {
       const base64 = await new File(doc.file_uri).base64();
       if (!base64.length) {
@@ -199,15 +216,18 @@ export const ReaderWebView = forwardRef<ReaderHandle, Props>(function ReaderWebV
     <View style={{ flex: 1, backgroundColor: theme.background }}>
       <WebView
         ref={webRef}
-        originWhitelist={['*']}
+        // The reader is fully self-contained (all libraries, fonts and the PDF
+        // worker are inlined into `html`), so it needs neither local-file access
+        // nor cross-origin file access, and only ever navigates within its own
+        // base origin. Keeping these off contains any content-level XSS: it
+        // cannot reach the filesystem or navigate the top frame off-origin.
+        originWhitelist={['https://revpdf.local']}
         source={{ html, baseUrl: 'https://revpdf.local/' }}
         onMessage={handleMessage}
         style={{ flex: 1, backgroundColor: theme.background }}
         containerStyle={{ flex: 1 }}
         javaScriptEnabled
         domStorageEnabled
-        allowFileAccess
-        allowUniversalAccessFromFileURLs
         setSupportMultipleWindows={false}
         overScrollMode="never"
         scrollEnabled={settings.readingMode === 'scroll'}
