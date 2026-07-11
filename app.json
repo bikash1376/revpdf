@@ -42,14 +42,17 @@
         "expo-build-properties",
         {
           "android": {
-            "buildArchs": ["arm64-v8a"],
+            "buildArchs": [
+              "arm64-v8a"
+            ],
             "enableMinifyInReleaseBuilds": true,
             "enableShrinkResourcesInReleaseBuilds": true,
             "enableBundleCompression": true,
             "useLegacyPackaging": true
           }
         }
-      ]
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true,

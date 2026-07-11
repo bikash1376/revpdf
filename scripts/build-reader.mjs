@@ -32,6 +32,9 @@ const pdf = read('node_modules/pdfjs-dist/build/pdf.min.js');
 const pdfWorker = read('node_modules/pdfjs-dist/build/pdf.worker.min.js');
 const marked = read('node_modules/marked/marked.min.js');
 const purify = read('node_modules/dompurify/dist/purify.min.js');
+// DOCX → HTML. The browser build is self-contained (it brings its own zip
+// reader), so it drops straight into the reflowable pipeline.
+const mammoth = read('node_modules/mammoth/mammoth.browser.min.js');
 const css = read('src/reader-web/reader.css');
 const controller = read('src/reader-web/controller.js');
 
@@ -78,6 +81,7 @@ const html = `<!doctype html>
 <script>${pdf}</script>
 <script>${marked}</script>
 <script>${purify}</script>
+<script>${mammoth}</script>
 <script>window.__PDF_WORKER_SRC__ = ${JSON.stringify(pdfWorker)};</script>
 <script>window.__READER_FONTS_CSS__ = ${JSON.stringify(fontFaces)};</script>
 <script>${controller}</script>

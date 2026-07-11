@@ -1,6 +1,6 @@
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { BackHandler, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import {
   Appbar,
@@ -10,14 +10,17 @@ import {
   FAB,
   Portal,
   Searchbar,
+  Snackbar,
   Text,
   useTheme,
 } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DocumentListItem } from '@/components/DocumentListItem';
+import { FirstRun } from '@/components/onboarding/FirstRun';
 import type { DocumentRow } from '@/db';
 import { useLibrary } from '@/store/library';
+import { useSettings } from '@/store/settings';
 import { spacing } from '@/theme/tokens';
 import { wordmark } from '@/theme/wordmark';
 
@@ -30,6 +33,20 @@ export default function LibraryScreen() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [menuDoc, setMenuDoc] = useState<DocumentRow | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const settings = useSettings();
+  // The first-run pitch stands in for the empty state exactly once, and only
+  // after the persisted settings have hydrated (otherwise it would flash on
+  // every cold start before we know whether it's already been seen).
+  const showFirstRun =
+    settings._hydrated && !settings.onboardingSeen && !loading && documents.length === 0;
+
+  // Seeing it counts as having seen it — this is the "first open" screen, not a
+  // screen that nags until the user converts something.
+  useEffect(() => {
+    if (showFirstRun) settings.set('onboardingSeen', true);
+  }, [showFirstRun, settings]);
 
   useFocusEffect(
     useCallback(() => {
@@ -84,12 +101,19 @@ export default function LibraryScreen() {
         </Appbar.Header>
       ) : (
         <Appbar.Header elevated>
-          <Appbar.Content title="Welcome back" />
+          <Appbar.Content title={showFirstRun ? 'Welcome' : 'Welcome back'} />
           <Appbar.Action icon="magnify" onPress={() => setSearchOpen(true)} />
           <Appbar.Action icon="cog-outline" onPress={() => router.push('/settings')} />
         </Appbar.Header>
       )}
 
+      {showFirstRun ? (
+        <FirstRun
+          onImport={handleImport}
+          onOpen={(id) => router.push(`/reader/${id}`)}
+          onError={setError}
+        />
+      ) : (
       <FlatList
         data={filtered}
         keyExtractor={(d) => d.id}
@@ -130,6 +154,7 @@ export default function LibraryScreen() {
           </View>
         }
       />
+      )}
 
       {filtered.length > 0 && (
         <FAB
@@ -174,6 +199,10 @@ export default function LibraryScreen() {
           </Dialog.Content>
         </Dialog>
       </Portal>
+
+      <Snackbar visible={!!error} onDismiss={() => setError(null)} duration={6000}>
+        {error ?? ''}
+      </Snackbar>
     </View>
   );
 }

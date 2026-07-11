@@ -6,7 +6,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import type { ReaderThemeName, ReadingFontKey, ThemeName } from '../theme/tokens';
+import type {
+  HighlightColorKey,
+  ReaderThemeName,
+  ReadingFontKey,
+  ThemeName,
+} from '../theme/tokens';
 
 export type SearchEngine = 'google' | 'duckduckgo' | 'yandex' | 'yahoo' | 'disabled';
 export type ReadingMode = 'paginated' | 'scroll';
@@ -31,6 +36,8 @@ export type SettingsState = {
 
   // signature features
   highlightingEnabled: boolean;
+  /** Color the one-tap highlight button applies, without asking. */
+  defaultHighlightColor: HighlightColorKey;
   bottomSheetEnabled: boolean;
   searchEngine: SearchEngine;
   openLinksIn: OpenLinksIn; // where result links open: in-app mini browser or system browser
@@ -50,6 +57,12 @@ export type SettingsState = {
   lineSpacing: number; // 0–100 (%)
   brightness: number | null; // 0–1, null = follow system
 
+  /**
+   * The first-run pitch (convert a PDF to EPUB) has been shown. It replaces the
+   * empty state exactly once; after that an empty library gets the plain one.
+   */
+  onboardingSeen: boolean;
+
   _hydrated: boolean;
   set: <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => void;
 };
@@ -61,6 +74,7 @@ export const useSettings = create<SettingsState>()(
       readerTheme: 'light',
 
       highlightingEnabled: true,
+      defaultHighlightColor: 'yellow',
       bottomSheetEnabled: true,
       searchEngine: 'google',
       openLinksIn: 'in-app',
@@ -77,6 +91,8 @@ export const useSettings = create<SettingsState>()(
       pageMargins: true,
       lineSpacing: 40,
       brightness: null,
+
+      onboardingSeen: false,
 
       _hydrated: false,
       set: (key, value) => set({ [key]: value } as Partial<SettingsState>),

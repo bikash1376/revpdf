@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -13,13 +14,20 @@ import {
   SegmentedButtons,
   Switch,
   Text,
+  TouchableRipple,
   useTheme,
 } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { clearHighlights, countHighlights } from '@/db';
 import { useSettings } from '@/store/settings';
-import { readerSurfaces, readingFonts, spacing, type ReadingFontKey } from '@/theme/tokens';
+import {
+  highlightColors,
+  readerSurfaces,
+  readingFonts,
+  spacing,
+  type ReadingFontKey,
+} from '@/theme/tokens';
 
 const PREVIEW =
   'Material Design is Google’s open-source design system for building beautiful, usable products. revpdf keeps the page in front and the controls out of the way.';
@@ -84,7 +92,7 @@ export default function ReaderSettingsScreen() {
         </View>
 
         <Text variant="bodySmall" style={[styles.note, { color: theme.colors.onSurfaceVariant }]}>
-          This theme only changes the page you read — the app's own theme lives in Settings →
+          This theme only changes the page you read — the app’s own theme lives in Settings →
           Appearance. Font, alignment, spacing and margins apply to reflowable formats (EPUB). PDF
           keeps its fixed layout — pinch to zoom; theme, brightness, highlight and search apply there.
         </Text>
@@ -205,10 +213,43 @@ export default function ReaderSettingsScreen() {
           />
         )}
 
+        <Divider style={{ marginVertical: spacing.sm }} />
+        <List.Subheader>Highlights</List.Subheader>
+        <Text
+          variant="bodySmall"
+          style={[styles.hint, { color: theme.colors.onSurfaceVariant }]}>
+          The colour the highlight button applies when you select text.
+        </Text>
+        <View style={styles.swatches}>
+          {highlightColors.map((c) => {
+            const active = s.defaultHighlightColor === c.key;
+            return (
+              <TouchableRipple
+                key={c.key}
+                borderless
+                onPress={() => s.set('defaultHighlightColor', c.key)}
+                style={styles.swatchTap}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                accessibilityLabel={c.label}>
+                <View
+                  style={[
+                    styles.swatch,
+                    {
+                      backgroundColor: c.value,
+                      borderColor: active ? theme.colors.primary : theme.colors.outline,
+                      borderWidth: active ? 3 : StyleSheet.hairlineWidth,
+                    },
+                  ]}>
+                  {active ? <MaterialCommunityIcons name="check" size={18} color="#1B1B1F" /> : null}
+                </View>
+              </TouchableRipple>
+            );
+          })}
+        </View>
+
         {id ? (
           <>
-            <Divider style={{ marginVertical: spacing.sm }} />
-            <List.Subheader>Highlights</List.Subheader>
             <List.Item
               title="Clear all highlights"
               description={
@@ -302,4 +343,20 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.4 },
   sliderRow: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
   sliderHeader: { flexDirection: 'row', justifyContent: 'space-between' },
+  hint: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
+  swatches: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
+  },
+  swatchTap: { borderRadius: 20 },
+  swatch: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 });

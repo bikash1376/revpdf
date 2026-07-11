@@ -17,6 +17,7 @@ import {
   type OutboundMessage,
   type ReaderTheme,
   type ReaderTypography,
+  type ReaderViewMode,
 } from '@/reader/bridge';
 import { loadReaderHtml } from '@/reader/readerHtml';
 import { useSettings } from '@/store/settings';
@@ -36,6 +37,7 @@ export type ReaderHandle = {
   removeHighlight: (id: string) => void;
   clearAllHighlights: () => void;
   clearSelection: () => void;
+  setViewMode: (view: ReaderViewMode) => void;
 };
 
 type Props = {
@@ -51,7 +53,13 @@ const MAX_DOCUMENT_BYTES = 100 * 1024 * 1024;
 
 function themeFromSettings(name: ReturnType<typeof useSettings.getState>['readerTheme']): ReaderTheme {
   const s = readerSurfaces[name];
-  return { key: name, background: s.background, text: s.text, link: s.link };
+  return {
+    key: name,
+    background: s.background,
+    text: s.text,
+    textSecondary: s.textSecondary,
+    link: s.link,
+  };
 }
 
 function typographyFromSettings(s: ReturnType<typeof useSettings.getState>): ReaderTypography {
@@ -114,6 +122,7 @@ export const ReaderWebView = forwardRef<ReaderHandle, Props>(function ReaderWebV
     removeHighlight: (id) => webRef.current?.injectJavaScript(cmd.removeHighlight(id)),
     clearAllHighlights: () => webRef.current?.injectJavaScript(cmd.clearAllHighlights()),
     clearSelection: () => webRef.current?.injectJavaScript(cmd.clearSelection()),
+    setViewMode: (view) => webRef.current?.injectJavaScript(cmd.setViewMode(view)),
   }));
 
   useEffect(() => {

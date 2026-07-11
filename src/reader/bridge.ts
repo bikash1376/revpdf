@@ -22,6 +22,8 @@ export type ReaderTheme = {
   key: 'light' | 'dark' | 'sepia' | 'twilight';
   background: string;
   text: string;
+  /** Dimmed text — used for the code view's line-number gutter. */
+  textSecondary: string;
   link: string;
 };
 
@@ -39,6 +41,15 @@ export type ReaderTypography = {
 
 export type TocItem = { label: string; href: string; cfi?: string };
 
+/** Which face of a reflowable document is showing (HTML's File/Browser tabs). */
+export type ReaderViewMode = 'rendered' | 'source';
+
+/**
+ * Where the selection sits, in WebView-viewport CSS px. The reader screen adds
+ * its own safe-area inset to place the floating action buttons over it.
+ */
+export type SelectionRect = { x: number; y: number; w: number; h: number };
+
 // ---- WebView → RN ----
 export type OutboundMessage =
   | { type: 'ready' }
@@ -46,11 +57,20 @@ export type OutboundMessage =
   | { type: 'location'; cfi: string; progress: number; chapter: string }
   | { type: 'tap'; zone: 'left' | 'center' | 'right' }
   | { type: 'link'; href: string }
-  | { type: 'selection'; text: string; cfiRange: string }
+  /**
+   * `anchor` is what gets persisted: a CFI for EPUB, or a JSON blob for PDF
+   * ({page, rects}) and reflowable text ({start, end}). Empty means the
+   * selection can't be anchored, so it can't be highlighted.
+   */
+  | { type: 'selection'; text: string; cfiRange: string; anchor: string; rect: SelectionRect }
   | { type: 'selectionCleared' }
   | { type: 'highlightTapped'; id: string; cfiRange: string }
   | { type: 'searchResults'; query: string; count: number }
   | { type: 'findResults'; query: string; count: number; index: number }
+  /** PDF→EPUB conversion progress (0..1) and a human-readable stage. */
+  | { type: 'convertProgress'; progress: number; stage: string }
+  /** The finished EPUB, base64-encoded, ready for RN to write to disk. */
+  | { type: 'converted'; base64: string }
   | { type: 'error'; message: string };
 
 const isStr = (v: unknown): v is string => typeof v === 'string';
@@ -93,10 +113,18 @@ function validateOutbound(msg: any): OutboundMessage | null {
       // Only surface links with a scheme we consider safe to open.
       if (isSafeExternalHref(msg.href)) return { type: 'link', href: msg.href.trim() };
       return null;
-    case 'selection':
-      if (isStr(msg.text) && isStr(msg.cfiRange))
-        return { type: 'selection', text: msg.text, cfiRange: msg.cfiRange };
-      return null;
+    case 'selection': {
+      if (!isStr(msg.text) || !isStr(msg.cfiRange)) return null;
+      const r = msg.rect;
+      if (!r || !isNum(r.x) || !isNum(r.y) || !isNum(r.w) || !isNum(r.h)) return null;
+      return {
+        type: 'selection',
+        text: msg.text,
+        cfiRange: msg.cfiRange,
+        anchor: isStr(msg.anchor) ? msg.anchor : '',
+        rect: { x: r.x, y: r.y, w: r.w, h: r.h },
+      };
+    }
     case 'highlightTapped':
       if (isStr(msg.id) && isStr(msg.cfiRange))
         return { type: 'highlightTapped', id: msg.id, cfiRange: msg.cfiRange };
@@ -108,6 +136,16 @@ function validateOutbound(msg: any): OutboundMessage | null {
     case 'findResults':
       if (isStr(msg.query) && isNum(msg.count) && isNum(msg.index))
         return { type: 'findResults', query: msg.query, count: msg.count, index: msg.index };
+      return null;
+    case 'convertProgress':
+      if (isNum(msg.progress) && isStr(msg.stage))
+        return { type: 'convertProgress', progress: msg.progress, stage: msg.stage };
+      return null;
+    case 'converted':
+      // Base64 only — this string gets written to disk, so reject anything that
+      // isn't the alphabet we expect.
+      if (isStr(msg.base64) && /^[A-Za-z0-9+/=\s]+$/.test(msg.base64))
+        return { type: 'converted', base64: msg.base64 };
       return null;
     case 'error':
       if (isStr(msg.message)) return { type: 'error', message: msg.message };
@@ -139,13 +177,18 @@ export const cmd = {
   prev: () => call('prev'),
   gotoCfi: (cfi: string) => call('gotoCfi', cfi),
   gotoHref: (href: string) => call('gotoHref', href),
-  addHighlight: (id: string, cfiRange: string, color: string) =>
-    call('addHighlight', id, cfiRange, color),
+  /** `anchor`: a CFI (EPUB) or a JSON anchor blob (PDF / reflowable text). */
+  addHighlight: (id: string, anchor: string, color: string) =>
+    call('addHighlight', id, anchor, color),
   removeHighlight: (id: string) => call('removeHighlight', id),
   renderHighlights: (items: { id: string; cfiRange: string; color: string }[]) =>
     call('renderHighlights', items),
   clearAllHighlights: () => call('clearAllHighlights'),
   setNativeMenu: (enabled: boolean) => call('setNativeMenu', enabled),
+  /** HTML File/Browser tabs: 'rendered' = the page, 'source' = highlighted markup. */
+  setViewMode: (view: ReaderViewMode) => call('setViewMode', view),
+  convertPdfToEpub: (base64: string, title: string) =>
+    call('convertPdfToEpub', base64, title),
   search: (query: string) => call('search', query),
   findInDoc: (query: string) => call('findInDoc', query),
   findNext: () => call('findNext'),

@@ -18,6 +18,13 @@ export type Selection = { text: string; cfiRange: string };
 
 type Props = {
   selection: Selection | null;
+  /**
+   * Whether the sheet is raised. When false but `selection` is set, the sheet
+   * stays mounted just off-screen so its WebView loads the search results in the
+   * background — tapping the search action then raises a sheet that's already
+   * populated instead of a spinner.
+   */
+  open: boolean;
   searchEngine: SearchEngine;
   openLinksIn: OpenLinksIn;
   highlightingEnabled: boolean;
@@ -48,6 +55,7 @@ function hostOf(u: string): string {
  */
 export function SelectionSheet({
   selection,
+  open,
   searchEngine,
   openLinksIn,
   highlightingEnabled,
@@ -62,6 +70,9 @@ export function SelectionSheet({
   const sheetRef = useRef<BottomSheet>(null);
   const webRef = useRef<WebView>(null);
   const [canGoBack, setCanGoBack] = useState(false);
+  // The sheet also sits at index -1 while it's prefetching, and that isn't a
+  // dismissal — so only treat a close as one once it has actually been raised.
+  const raised = useRef(false);
 
   const searchEnabled = searchEngine !== 'disabled';
   const url = useMemo(() => {
@@ -91,13 +102,18 @@ export function SelectionSheet({
   );
 
   useEffect(() => {
-    if (selection) sheetRef.current?.snapToIndex(0);
-    else sheetRef.current?.close();
-  }, [selection]);
+    if (selection && open) {
+      raised.current = true;
+      sheetRef.current?.snapToIndex(0);
+    } else if (!selection) {
+      sheetRef.current?.close();
+    }
+  }, [selection, open]);
 
   // Hardware back: step through in-app browser history, then close (→ reader).
+  // Only while raised — a prefetching sheet must not swallow the back button.
   useEffect(() => {
-    if (!selection) return;
+    if (!selection || !open) return;
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (canGoBack) {
         webRef.current?.goBack();
@@ -107,9 +123,13 @@ export function SelectionSheet({
       return true;
     });
     return () => sub.remove();
-  }, [selection, canGoBack]);
+  }, [selection, open, canGoBack]);
 
-  const handleClose = useCallback(() => onDismiss(), [onDismiss]);
+  const handleClose = useCallback(() => {
+    if (!raised.current) return; // settling into the prefetch position, not a dismiss
+    raised.current = false;
+    onDismiss();
+  }, [onDismiss]);
 
   const onNav = useCallback((s: WebViewNavigation) => setCanGoBack(s.canGoBack), []);
 
@@ -155,7 +175,9 @@ export function SelectionSheet({
   return (
     <BottomSheet
       ref={sheetRef}
-      index={0}
+      // Starts closed: the search WebView below still mounts and loads, which is
+      // what makes the results already be there when the sheet is raised.
+      index={-1}
       snapPoints={snapPoints}
       enableDynamicSizing={false}
       enablePanDownToClose

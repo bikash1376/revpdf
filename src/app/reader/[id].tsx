@@ -3,10 +3,20 @@ import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-import { Appbar, IconButton, Menu, Snackbar, Text, TextInput, useTheme } from 'react-native-paper';
+import {
+  Appbar,
+  IconButton,
+  Menu,
+  SegmentedButtons,
+  Snackbar,
+  Text,
+  TextInput,
+  useTheme,
+} from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ReaderWebView, type ReaderHandle } from '@/components/ReaderWebView';
+import { SelectionActions } from '@/components/SelectionActions';
 import { SelectionSheet } from '@/components/SelectionSheet';
 import {
   addHighlight,
@@ -17,9 +27,25 @@ import {
   updateProgress,
   type DocumentRow,
 } from '@/db';
-import { isSafeExternalHref, type OutboundMessage, type TocItem } from '@/reader/bridge';
+import {
+  isSafeExternalHref,
+  type OutboundMessage,
+  type ReaderViewMode,
+  type SelectionRect,
+  type TocItem,
+} from '@/reader/bridge';
 import { useSettings } from '@/store/settings';
-import { readerSurfaces } from '@/theme/tokens';
+import { highlightColors, readerSurfaces } from '@/theme/tokens';
+
+type ActiveSelection = {
+  text: string;
+  cfiRange: string;
+  /** CFI (EPUB) or JSON blob (PDF / reflow). Empty ⇒ can't be highlighted. */
+  anchor: string;
+  rect: SelectionRect;
+};
+
+const NO_RECT: SelectionRect = { x: 0, y: 0, w: 0, h: 0 };
 
 export default function ReaderScreen() {
   const theme = useTheme();
@@ -38,10 +64,24 @@ export default function ReaderScreen() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [toc, setToc] = useState<TocItem[]>([]);
   const [progress, setProgress] = useState(0);
-  const [selection, setSelection] = useState<{ text: string; cfiRange: string } | null>(null);
+  const [selection, setSelection] = useState<ActiveSelection | null>(null);
+  // The search sheet is mounted (and loading) as soon as there's a selection, but
+  // only raised once the user taps the search action — or lands here by tapping
+  // an existing highlight, which needs the sheet's recolor/delete row.
+  const [sheetOpen, setSheetOpen] = useState(false);
   // Set when the open sheet is editing an existing highlight (recolor / delete).
   const [editingHl, setEditingHl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // HTML documents can be read as the rendered page or as their source. Other
+  // formats have only one face, so the tabs never appear for them.
+  const [viewMode, setViewMode] = useState<ReaderViewMode>('rendered');
+  const hasTabs = doc?.format === 'html';
+
+  const switchView = (v: ReaderViewMode) => {
+    setViewMode(v);
+    readerRef.current?.setViewMode(v);
+  };
 
   // In-document search.
   const [findActive, setFindActive] = useState(false);
@@ -108,18 +148,28 @@ export default function ReaderScreen() {
       case 'selection':
         if (settings.bottomSheetEnabled || settings.highlightingEnabled) {
           setEditingHl(null);
-          setSelection({ text: msg.text, cfiRange: msg.cfiRange });
+          // Actions only; the sheet stays down and prefetches its results.
+          setSheetOpen(false);
+          setSelection({
+            text: msg.text,
+            cfiRange: msg.cfiRange,
+            anchor: msg.anchor,
+            rect: msg.rect,
+          });
         }
         break;
       case 'highlightTapped':
-        // Tapped an existing highlight → open the sheet to recolor / delete it.
+        // Tapped an existing highlight → raise the sheet straight to its
+        // recolor / delete row (no action buttons in this mode).
         if (!settings.highlightingEnabled) break;
         setEditingHl(msg.id);
-        setSelection({ text: '', cfiRange: msg.cfiRange });
+        setSelection({ text: '', cfiRange: msg.cfiRange, anchor: msg.cfiRange, rect: NO_RECT });
+        setSheetOpen(true);
         break;
       case 'selectionCleared':
         setSelection(null);
         setEditingHl(null);
+        setSheetOpen(false);
         break;
       case 'findResults':
         setFindInfo({ count: msg.count, index: msg.index });
@@ -130,32 +180,40 @@ export default function ReaderScreen() {
     }
   };
 
-  const canHighlight = !!selection?.cfiRange; // EPUB only (PDF has no CFI anchor yet)
+  // Any format the engine could anchor — EPUB via CFI, PDF via {page,rects},
+  // reflowable text via character offsets.
+  const canHighlight = !!selection?.anchor;
+
+  const defaultHighlight =
+    highlightColors.find((c) => c.key === settings.defaultHighlightColor)?.value ??
+    highlightColors[0].value;
 
   const doHighlight = async (color: string) => {
-    if (!selection || !id || !selection.cfiRange) return;
+    if (!selection || !id || !selection.anchor) return;
+    const anchor = selection.anchor;
     if (editingHl) {
       // Recolor the existing highlight in place.
       readerRef.current?.removeHighlight(editingHl);
-      readerRef.current?.addHighlight(editingHl, selection.cfiRange, color);
+      readerRef.current?.addHighlight(editingHl, anchor, color);
       await updateHighlightColor(editingHl, color);
       setHighlights((hs) => hs.map((h) => (h.id === editingHl ? { ...h, color } : h)));
     } else {
       const hid = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-      readerRef.current?.addHighlight(hid, selection.cfiRange, color);
+      readerRef.current?.addHighlight(hid, anchor, color);
       await addHighlight({
         id: hid,
         document_id: id,
         color,
-        anchor: selection.cfiRange,
+        anchor,
         text_excerpt: selection.text.slice(0, 280),
         created_at: Date.now(),
       });
-      setHighlights((hs) => [{ id: hid, cfiRange: selection.cfiRange, color }, ...hs]);
+      setHighlights((hs) => [{ id: hid, cfiRange: anchor, color }, ...hs]);
     }
     readerRef.current?.clearSelection();
     setSelection(null);
     setEditingHl(null);
+    setSheetOpen(false);
   };
 
   const doDeleteHighlight = async () => {
@@ -166,12 +224,14 @@ export default function ReaderScreen() {
     readerRef.current?.clearSelection();
     setSelection(null);
     setEditingHl(null);
+    setSheetOpen(false);
   };
 
   const dismissSelection = () => {
     readerRef.current?.clearSelection();
     setSelection(null);
     setEditingHl(null);
+    setSheetOpen(false);
   };
 
   const closeFind = () => {
@@ -264,6 +324,20 @@ export default function ReaderScreen() {
               />
             </Menu>
           </Appbar.Header>
+
+          {hasTabs && (
+            <View style={[styles.tabs, { backgroundColor: theme.colors.surface }]}>
+              <SegmentedButtons
+                density="small"
+                value={viewMode}
+                onValueChange={(v) => switchView(v as ReaderViewMode)}
+                buttons={[
+                  { value: 'rendered', label: 'Browser', icon: 'web' },
+                  { value: 'source', label: 'File', icon: 'code-tags' },
+                ]}
+              />
+            </View>
+          )}
         </View>
       )}
 
@@ -309,9 +383,26 @@ export default function ReaderScreen() {
         {error ?? ''}
       </Snackbar>
 
-      {/* Chrome-style selection → search sheet (auto-loads results). */}
+      {/* Floating actions over the selection: one-tap highlight, and the search
+          button whose sheet is already loading underneath. */}
+      {selection && !editingHl && !sheetOpen && (
+        <SelectionActions
+          rect={selection.rect}
+          insetTop={insets.top}
+          insetLeft={insets.left}
+          showHighlight={settings.highlightingEnabled && canHighlight}
+          showSearch={settings.bottomSheetEnabled && settings.searchEngine !== 'disabled'}
+          highlightColor={defaultHighlight}
+          onHighlight={() => doHighlight(defaultHighlight)}
+          onSearch={() => setSheetOpen(true)}
+        />
+      )}
+
+      {/* Chrome-style selection → search sheet. Mounted as soon as there's a
+          selection so its results load in the background; raised on demand. */}
       <SelectionSheet
         selection={settings.bottomSheetEnabled || settings.highlightingEnabled ? selection : null}
+        open={sheetOpen}
         searchEngine={
           editingHl ? 'disabled' : settings.bottomSheetEnabled ? settings.searchEngine : 'disabled'
         }
@@ -346,4 +437,5 @@ const styles = StyleSheet.create({
   title: { fontSize: 16 },
   findInput: { flex: 1, height: 44, backgroundColor: 'transparent' },
   pageZone: { position: 'absolute', width: '16%' },
+  tabs: { paddingHorizontal: 16, paddingBottom: 8 },
 });

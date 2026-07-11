@@ -2,10 +2,10 @@
 <p align="center">
   <img src="web/public/screenshots/screen-1.gif" width="24%" alt="Demo" />
 </p>
-A minimalist, **fully local** document reader for **PDF, EPUB, DOC and DOCX** — built with
-Expo + React Native and Google's Material Design 3. Modeled on ReadEra's calm reading
-experience, with two signature additions: **hold-to-highlight** and a **Chrome-style selection
-search** sheet.
+A minimalist, **fully local** document reader for **PDF, EPUB, DOCX** and plain-text formats
+(TXT, Markdown, HTML, JSON, CSV) — built with Expo + React Native and Google's Material
+Design 3. Modeled on ReadEra's calm reading experience, with two signature additions:
+**hold-to-highlight** and a **Chrome-style selection search** sheet.
 
 Everything stays on the device. No accounts, no servers, no cloud.
 
@@ -28,7 +28,11 @@ Everything stays on the device. No accounts, no servers, no cloud.
 ## Features
 
 **Reading**
-- PDF, EPUB, DOC, DOCX (PDF fixed-layout; EPUB/DOCX reflowable).
+- PDF (fixed-layout, pinch-to-zoom re-renders at scale), EPUB, DOCX, and TXT / Markdown /
+  HTML / JSON / CSV — all reflowable.
+- HTML opens with **Browser / File** tabs; the File tab and JSON get syntax highlighting,
+  line numbers and a monospace face.
+- Legacy binary `.doc` is not supported — save it as `.docx`.
 - Three reading themes: **Light / Dark / Sepia**. Dark text is a soft gray, never harsh white.
 - Typography (reflowable): font family (Alice, Comfortaa, Merriweather, Roboto, Noto Serif),
   font size, font thickness, alignment (justify/left/center/right), hyphenation, page margins,

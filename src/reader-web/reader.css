@@ -23,10 +23,21 @@ body {
 #viewer.pdf {
   overflow: auto;
   -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
+  /* Pan freely, but never let the browser own the pinch: its zoom just magnifies
+     the rasterized canvas. controller.js handles pinch and re-renders instead. */
+  touch-action: pan-x pan-y;
+}
+/* Pages live in a wrapper because a scroll container can't transform itself and
+   the live pinch preview needs a transform target. */
+#pdf-pages {
   display: flex;
   flex-direction: column;
   align-items: center;
   padding: 8px 0;
+  transform-origin: 0 0;
+  width: max-content;
+  min-width: 100%;
   box-sizing: border-box;
 }
 /* Reader-theme tint for PDF pages (the page itself is a baked white image, so
@@ -60,6 +71,21 @@ body {
   display: block;
 }
 
+/* Highlight overlay for a PDF page. Sits above the canvas (and above the
+   twilight tint) but below the text layer, so it never intercepts the caret
+   hit-testing the selection engine depends on. Rect geometry and blend mode are
+   set inline by the controller. */
+.pdf-hl {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+.pdf-hl-rect {
+  position: absolute;
+  border-radius: 2px;
+}
+
 /* pdf.js text layer — transparent text aligned over the canvas for selection */
 .textLayer {
   position: absolute;
@@ -67,7 +93,7 @@ body {
   overflow: hidden;
   opacity: 1;
   line-height: 1;
-  z-index: 2;
+  z-index: 3;
 }
 .textLayer span,
 .textLayer br {
@@ -87,11 +113,25 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 #rp-article {
+  position: relative; /* positioning context for the highlight overlay */
   max-width: 760px;
   margin: 0 auto;
   padding: 16px;
   box-sizing: border-box;
   word-wrap: break-word;
+}
+
+/* Highlight overlay for reflowable text. Painted over the words (blend mode is
+   set inline per theme) so it reads like marker ink rather than a backdrop. */
+#rp-hl {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+.rp-hl-rect {
+  position: absolute;
+  border-radius: 2px;
 }
 #rp-article img {
   max-width: 100%;
@@ -123,4 +163,35 @@ body {
   position: sticky;
   top: 0;
   background: inherit;
+}
+
+/* ---- code view (JSON, and the File tab of an HTML document) ---- */
+.rp-code-view {
+  margin: 0;
+  font-family: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, Consolas, monospace;
+  font-size: 0.82em;
+  line-height: 1.55;
+  /* Long lines scroll sideways inside the listing rather than wrapping, so the
+     line numbers keep meaning what they say. */
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+/* One block per source line; the gutter is the ::before counter, so no second
+   column to keep in sync when the text scrolls. */
+.rp-code-view .rp-line {
+  display: block;
+  position: relative;
+  padding-left: 3.6em;
+  white-space: pre;
+  min-height: 1.55em;
+}
+.rp-code-view .rp-line::before {
+  content: attr(data-n);
+  position: absolute;
+  left: 0;
+  width: 2.8em;
+  text-align: right;
+  opacity: 0.5;
+  -webkit-user-select: none;
+  user-select: none;
 }
