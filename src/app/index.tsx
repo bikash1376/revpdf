@@ -102,6 +102,13 @@ export default function LibraryScreen() {
       ) : (
         <Appbar.Header elevated>
           <Appbar.Content title={showFirstRun ? 'Welcome' : 'Welcome back'} />
+          {/* The first-run walkthrough (demo clip + PDF→EPUB conversion) is
+              otherwise unreachable once you have documents. */}
+          <Appbar.Action
+            icon="help-circle-outline"
+            accessibilityLabel="How RevPdf works"
+            onPress={() => router.push('/onboarding')}
+          />
           <Appbar.Action icon="magnify" onPress={() => setSearchOpen(true)} />
           <Appbar.Action icon="cog-outline" onPress={() => router.push('/settings')} />
         </Appbar.Header>

@@ -17,6 +17,12 @@ type Props = {
   onImport: () => void;
   onOpen: (documentId: string) => void;
   onError: (message: string) => void;
+  /**
+   * Play the demo clip straight away, instead of only while a conversion runs.
+   * Set when the screen was opened deliberately from the help button — you came
+   * to watch, so don't make converting a PDF the price of admission.
+   */
+  demoUpfront?: boolean;
 };
 
 /**
@@ -26,7 +32,7 @@ type Props = {
  *
  * Shown only while the library is empty; importing normally is still right there.
  */
-export function FirstRun({ onImport, onOpen, onError }: Props) {
+export function FirstRun({ onImport, onOpen, onError, demoUpfront }: Props) {
   const theme = useTheme();
   const [phase, setPhase] = useState<Phase>('pitch');
   const [source, setSource] = useState<{ uri: string; title: string } | null>(null);
@@ -91,6 +97,7 @@ export function FirstRun({ onImport, onOpen, onError }: Props) {
         showsVerticalScrollIndicator={false}>
         {phase === 'pitch' ? (
           <>
+            {demoUpfront && <DemoVideo height={videoH} />}
             <Text variant="headlineSmall" style={[styles.h, { color: theme.colors.onSurface }]}>
               EPUB reads better than PDF
             </Text>
