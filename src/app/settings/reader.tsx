@@ -20,7 +20,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { clearHighlights, countHighlights } from '@/db';
-import { useSettings } from '@/store/settings';
+import { SEARCH_ENGINES, useSettings } from '@/store/settings';
 import {
   highlightColors,
   readerSurfaces,
@@ -35,11 +35,17 @@ const PREVIEW =
 // Approximate the bundled web fonts with platform faces for the native preview.
 const SERIF_FONTS: ReadingFontKey[] = ['alice', 'merriweather', 'notoSerif'];
 
+type Tab = 'display' | 'reading';
+
 export default function ReaderSettingsScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const s = useSettings();
   const surface = readerSurfaces[s.readerTheme];
+  const [tab, setTab] = useState<Tab>('display');
+
+  const searchLabel =
+    s.searchEngine === 'disabled' ? 'Disabled' : SEARCH_ENGINES[s.searchEngine].label;
   // When opened from inside a PDF, font face/size don't apply (fixed layout) —
   // fade those controls out. Reflowable formats (and the global entry from
   // Settings, where no format is passed) keep them active.
@@ -74,7 +80,23 @@ export default function ReaderSettingsScreen() {
         <Appbar.Content title="Reader" />
       </Appbar.Header>
 
+      {/* Two tabs, so the things you change while reading — engine, highlighting,
+          reading mode — are one tap away instead of buried in app settings. */}
+      <View style={[styles.tabs, { backgroundColor: theme.colors.surface }]}>
+        <SegmentedButtons
+          value={tab}
+          onValueChange={(v) => setTab(v as Tab)}
+          density="small"
+          buttons={[
+            { value: 'display', label: 'Display', icon: 'format-font' },
+            { value: 'reading', label: 'Reading', icon: 'book-open-variant' },
+          ]}
+        />
+      </View>
+
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
+        {tab === 'display' ? (
+          <>
         {/* live preview */}
         <View style={[styles.preview, { backgroundColor: surface.surface, borderColor: surface.outline }]}>
           <Text
@@ -212,59 +234,125 @@ export default function ReaderSettingsScreen() {
             onChange={(v) => s.set('brightness', v / 100)}
           />
         )}
-
-        <Divider style={{ marginVertical: spacing.sm }} />
-        <List.Subheader>Highlights</List.Subheader>
-        <Text
-          variant="bodySmall"
-          style={[styles.hint, { color: theme.colors.onSurfaceVariant }]}>
-          The colour the highlight button applies when you select text.
-        </Text>
-        <View style={styles.swatches}>
-          {highlightColors.map((c) => {
-            const active = s.defaultHighlightColor === c.key;
-            return (
-              <TouchableRipple
-                key={c.key}
-                borderless
-                onPress={() => s.set('defaultHighlightColor', c.key)}
-                style={styles.swatchTap}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                accessibilityLabel={c.label}>
-                <View
-                  style={[
-                    styles.swatch,
-                    {
-                      backgroundColor: c.value,
-                      borderColor: active ? theme.colors.primary : theme.colors.outline,
-                      borderWidth: active ? 3 : StyleSheet.hairlineWidth,
-                    },
-                  ]}>
-                  {active ? <MaterialCommunityIcons name="check" size={18} color="#1B1B1F" /> : null}
-                </View>
-              </TouchableRipple>
-            );
-          })}
-        </View>
-
-        {id ? (
-          <>
-            <List.Item
-              title="Clear all highlights"
-              description={
-                hlCount === null
-                  ? 'Loading…'
-                  : hlCount === 0
-                    ? 'No highlights in this document'
-                    : `Remove all ${hlCount} highlight${hlCount === 1 ? '' : 's'} from this document`
-              }
-              left={(p) => <List.Icon {...p} icon="marker-cancel" />}
-              disabled={!hlCount}
-              onPress={() => setConfirmClear(true)}
-            />
           </>
-        ) : null}
+        ) : (
+          <>
+            <List.Subheader>Reading mode</List.Subheader>
+            <View style={styles.block}>
+              <SegmentedButtons
+                value={s.readingMode}
+                onValueChange={(v) => s.set('readingMode', v as typeof s.readingMode)}
+                buttons={[
+                  { value: 'paginated', label: 'Paginated', icon: 'book-open-outline' },
+                  { value: 'scroll', label: 'Scroll', icon: 'arrow-down' },
+                ]}
+              />
+            </View>
+
+            <Divider style={{ marginVertical: spacing.sm }} />
+            <List.Subheader>Highlights</List.Subheader>
+            <List.Item
+              title="Highlighting"
+              description="Show the highlight button when you select text"
+              left={(p) => <List.Icon {...p} icon="marker" />}
+              right={() => (
+                <Switch
+                  value={s.highlightingEnabled}
+                  onValueChange={(v) => s.set('highlightingEnabled', v)}
+                />
+              )}
+            />
+            <Text
+              variant="bodySmall"
+              style={[styles.hint, { color: theme.colors.onSurfaceVariant }]}>
+              The colour the highlight button applies when you select text.
+            </Text>
+            <View style={styles.swatches}>
+              {highlightColors.map((c) => {
+                const active = s.defaultHighlightColor === c.key;
+                return (
+                  <TouchableRipple
+                    key={c.key}
+                    borderless
+                    onPress={() => s.set('defaultHighlightColor', c.key)}
+                    style={styles.swatchTap}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    accessibilityLabel={c.label}>
+                    <View
+                      style={[
+                        styles.swatch,
+                        {
+                          backgroundColor: c.value,
+                          borderColor: active ? theme.colors.primary : theme.colors.outline,
+                          borderWidth: active ? 3 : StyleSheet.hairlineWidth,
+                        },
+                      ]}>
+                      {active ? (
+                        <MaterialCommunityIcons name="check" size={18} color="#1B1B1F" />
+                      ) : null}
+                    </View>
+                  </TouchableRipple>
+                );
+              })}
+            </View>
+
+            {id ? (
+              <List.Item
+                title="Clear all highlights"
+                description={
+                  hlCount === null
+                    ? 'Loading…'
+                    : hlCount === 0
+                      ? 'No highlights in this document'
+                      : `Remove all ${hlCount} highlight${hlCount === 1 ? '' : 's'} from this document`
+                }
+                left={(p) => <List.Icon {...p} icon="marker-cancel" />}
+                disabled={!hlCount}
+                onPress={() => setConfirmClear(true)}
+              />
+            ) : null}
+
+            <Divider style={{ marginVertical: spacing.sm }} />
+            <List.Subheader>Selection search</List.Subheader>
+            <List.Item
+              title="Search sheet"
+              description="Show the search button when you select text"
+              left={(p) => <List.Icon {...p} icon="dock-bottom" />}
+              right={() => (
+                <Switch
+                  value={s.bottomSheetEnabled}
+                  onValueChange={(v) => s.set('bottomSheetEnabled', v)}
+                />
+              )}
+            />
+            <List.Item
+              title="Search engine"
+              description={searchLabel}
+              left={(p) => <List.Icon {...p} icon="magnify" />}
+              right={(p) => <List.Icon {...p} icon="chevron-right" />}
+              onPress={() => router.push('/settings/search')}
+            />
+
+            <View style={styles.block}>
+              <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>
+                Open links
+              </Text>
+              <SegmentedButtons
+                value={s.openLinksIn}
+                onValueChange={(v) => s.set('openLinksIn', v as typeof s.openLinksIn)}
+                style={{ marginVertical: spacing.sm }}
+                buttons={[
+                  { value: 'in-app', label: 'In app', icon: 'application-outline' },
+                  { value: 'external', label: 'Browser', icon: 'open-in-new' },
+                ]}
+              />
+              <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
+                Where a result link opens: a mini browser inside revpdf, or your phone’s browser.
+              </Text>
+            </View>
+          </>
+        )}
       </ScrollView>
 
       <Portal>
@@ -343,6 +431,7 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.4 },
   sliderRow: { paddingHorizontal: spacing.md, paddingTop: spacing.sm },
   sliderHeader: { flexDirection: 'row', justifyContent: 'space-between' },
+  tabs: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   hint: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm },
   swatches: {
     flexDirection: 'row',

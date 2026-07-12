@@ -293,7 +293,6 @@ return ctor.prototype=parent.prototype,child.prototype=new ctor,child.__super__=
   var mode = null; // 'epub' | 'pdf'
   var lastTheme = null;
   var hlCfi = {}; // highlight id -> cfiRange (epub.js keys annotations by CFI)
-  var allowNativeMenu = false; // show the OS copy/paste/share menu on selection
   var pdf = {
     doc: null,
     total: 0,
@@ -480,6 +479,7 @@ return ctor.prototype=parent.prototype,child.prototype=new ctor,child.__super__=
 
   var selHosts = []; // every document we've installed the engine into
   var selCur = null; // { host, range }
+  var selLastHost = null; // host of the most recent touch — the target for selectAll
   var selDrag = null; // 'start' | 'end' while a handle is being dragged
   var selDragOff = { x: 0, y: 0 }; // finger→caret offset, captured at drag start
   var selRaf = 0;
@@ -591,62 +591,88 @@ return ctor.prototype=parent.prototype,child.prototype=new ctor,child.__super__=
 
   function selClearPaint(host) {
     if (!host || !host.layer) return;
-    while (host.layer.firstChild) host.layer.removeChild(host.layer.firstChild);
+    host.rects.forEach(function (d) {
+      d.style.display = 'none';
+    });
+    host.startH.style.display = 'none';
+    host.endH.style.display = 'none';
   }
 
+  /**
+   * Move the overlay onto the current range.
+   *
+   * Nothing here creates or destroys a node that a gesture might be touching.
+   * The previous version rebuilt the handles on every repaint, and since a drag
+   * repaints on each move, the very node the touch was dispatched to was ripped
+   * out of the document on the first frame — after which `touchmove` had no
+   * ancestor path to the document listener and the drag silently died. That was
+   * the "handles don't extend the selection" bug. Handles are now permanent and
+   * rect divs are pooled; we only ever set styles.
+   */
   function selPaint() {
-    selHosts.forEach(selClearPaint);
+    selHosts.forEach(function (h) {
+      if (!selCur || h !== selCur.host) selClearPaint(h);
+    });
     if (!selCur) return;
     var host = selCur.host;
-    var rects = selRects(selCur.range);
-    if (!rects.length) return;
     var doc = host.doc;
-    var frag = doc.createDocumentFragment();
+    var rects = selRects(selCur.range);
+    if (!rects.length) {
+      selClearPaint(host);
+      return;
+    }
 
-    rects.forEach(function (r) {
+    while (host.rects.length < rects.length) {
       var d = doc.createElement('div');
       d.className = 'rp-sel-rect';
-      d.style.left = r.left + 'px';
-      d.style.top = r.top + 'px';
-      d.style.width = r.width + 'px';
-      d.style.height = r.height + 'px';
-      frag.appendChild(d);
+      host.layer.appendChild(d);
+      host.rects.push(d);
+    }
+    host.rects.forEach(function (el, i) {
+      var r = rects[i];
+      if (!r) {
+        el.style.display = 'none';
+        return;
+      }
+      el.style.display = 'block';
+      el.style.left = r.left + 'px';
+      el.style.top = r.top + 'px';
+      el.style.width = r.width + 'px';
+      el.style.height = r.height + 'px';
     });
 
-    // Handles, per the reference: a dot above the caret bar at the start of the
+    // Per the reference: a dot above the caret bar at the start of the
     // selection, and a dot below the bar at the end.
     var first = rects[0];
     var last = rects[rects.length - 1];
 
-    var start = doc.createElement('div');
-    start.className = 'rp-sel-h';
-    start.setAttribute('data-h', 'start');
-    start.style.left = first.left - 14 + 'px';
-    start.style.top = first.top - 14 + 'px';
-    start.style.height = first.height + 14 + 'px';
-    start.innerHTML =
-      '<i style="top:0"></i><b style="top:14px;height:' + first.height + 'px"></b>';
-    frag.appendChild(start);
+    var s = host.startH;
+    s.style.display = 'block';
+    s.style.left = first.left - 14 + 'px';
+    s.style.top = first.top - 14 + 'px';
+    s.style.height = first.height + 14 + 'px';
+    s.firstChild.style.top = '0px'; // <i> dot
+    s.lastChild.style.top = '14px'; // <b> bar
+    s.lastChild.style.height = first.height + 'px';
 
-    var end = doc.createElement('div');
-    end.className = 'rp-sel-h';
-    end.setAttribute('data-h', 'end');
-    end.style.left = last.right - 14 + 'px';
-    end.style.top = last.top + 'px';
-    end.style.height = last.height + 14 + 'px';
-    end.innerHTML =
-      '<b style="top:0;height:' + last.height + 'px"></b><i style="top:' + last.height + 'px"></i>';
-    frag.appendChild(end);
-
-    host.layer.appendChild(frag);
+    var e = host.endH;
+    e.style.display = 'block';
+    e.style.left = last.right - 14 + 'px';
+    e.style.top = last.top + 'px';
+    e.style.height = last.height + 14 + 'px';
+    e.firstChild.style.top = '0px'; // <b> bar
+    e.firstChild.style.height = last.height + 'px';
+    e.lastChild.style.top = last.height + 'px'; // <i> dot
   }
 
+  // Repaint only. The actions are parked bottom-right now, so a moved selection
+  // doesn't move any RN chrome — and re-posting `selection` on every scroll frame
+  // would churn RN state (and close an open search sheet).
   function selRepaint() {
     if (selRaf) return;
     selRaf = requestAnimationFrame(function () {
       selRaf = 0;
       selPaint();
-      if (selCur) selPost(); // the rect moved, so RN's buttons must move too
     });
   }
 
@@ -728,16 +754,38 @@ return ctor.prototype=parent.prototype,child.prototype=new ctor,child.__super__=
     selInstallCss(doc);
 
     var body = doc.body || doc.documentElement;
-    var host = { doc: doc, kind: kind, frame: frame || null, contents: contents || null, layer: null };
+    var host = {
+      doc: doc,
+      kind: kind,
+      frame: frame || null,
+      contents: contents || null,
+      layer: null,
+      rects: [], // pooled selection rectangles
+      startH: null,
+      endH: null,
+    };
 
     var layer = doc.createElement('div');
     layer.id = 'rp-sel-layer';
     body.appendChild(layer);
     host.layer = layer;
 
-    // If the user asked for the OS menu, leave the platform's selection alone
-    // and don't run ours — the two can't coexist.
-    if (!allowNativeMenu) body.classList.add('rp-nosel');
+    // Built once, moved forever. See selPaint() for why this matters.
+    host.startH = doc.createElement('div');
+    host.startH.className = 'rp-sel-h';
+    host.startH.setAttribute('data-h', 'start');
+    host.startH.innerHTML = '<i></i><b></b>';
+    host.endH = doc.createElement('div');
+    host.endH.className = 'rp-sel-h';
+    host.endH.setAttribute('data-h', 'end');
+    host.endH.innerHTML = '<b></b><i></i>';
+    layer.appendChild(host.startH);
+    layer.appendChild(host.endH);
+    selClearPaint(host);
+
+    // Suppresses Android's own selection handles and floating copy bar. Copy /
+    // share / select-all are provided by RN instead (see RP.selectAll).
+    body.classList.add('rp-nosel');
 
     var lpTimer = null;
     var sx = 0;
@@ -751,23 +799,24 @@ return ctor.prototype=parent.prototype,child.prototype=new ctor,child.__super__=
       }
     }
 
+    // Capture phase throughout: epub.js installs its own swipe handling on the
+    // chapter document, and a bubble-phase listener can be starved by it.
     doc.addEventListener(
       'touchstart',
       function (e) {
-        if (allowNativeMenu) return;
         var t = e.touches[0];
         if (!t) return;
+        selLastHost = host;
 
-        var handle =
-          e.target && e.target.closest ? e.target.closest('.rp-sel-h') : null;
+        var handle = e.target && e.target.closest ? e.target.closest('.rp-sel-h') : null;
         if (handle && selCur) {
           selBeginDrag(host, handle.getAttribute('data-h'), t);
           suppressTapUntil = Date.now() + 600;
           return;
         }
 
-        // A tap anywhere else dismisses the current selection rather than
-        // toggling the reader chrome.
+        // A tap anywhere else dismisses the selection rather than toggling the
+        // reader chrome.
         if (selCur) {
           selClear(false);
           suppressTapUntil = Date.now() + 400;
@@ -791,17 +840,17 @@ return ctor.prototype=parent.prototype,child.prototype=new ctor,child.__super__=
           selPost();
         }, 380);
       },
-      { passive: true },
+      { passive: true, capture: true },
     );
 
     doc.addEventListener(
       'touchmove',
       function (e) {
-        if (allowNativeMenu) return;
         var t = e.touches[0];
         if (!t) return;
         if (selDrag && selCur) {
           e.preventDefault(); // dragging a handle must not scroll the document
+          e.stopPropagation(); // ...nor page the book
           selMoveDrag(host, t);
           return;
         }
@@ -810,18 +859,18 @@ return ctor.prototype=parent.prototype,child.prototype=new ctor,child.__super__=
           cancelLp();
         }
       },
-      { passive: false },
+      { passive: false, capture: true },
     );
 
     function endTouch() {
       cancelLp();
       if (selDrag) {
         selDrag = null;
-        selPost(); // commit the dragged range (and its new rect) to RN
+        selPost(); // commit the dragged range to RN
       }
     }
-    doc.addEventListener('touchend', endTouch, { passive: true });
-    doc.addEventListener('touchcancel', endTouch, { passive: true });
+    doc.addEventListener('touchend', endTouch, { passive: true, capture: true });
+    doc.addEventListener('touchcancel', endTouch, { passive: true, capture: true });
 
     // The selection is painted in fixed coords, so anything that scrolls it must
     // repaint. (Page turns clear it instead — see the EPUB relocated hook.)
@@ -1971,20 +2020,6 @@ return ctor.prototype=parent.prototype,child.prototype=new ctor,child.__super__=
           });
         });
 
-        // Only epub.js' own selection path when the user explicitly asked for the
-        // OS menu; otherwise our engine owns selection (see selInstall below).
-        rendition.on('selected', function (cfiRange, contents) {
-          if (!allowNativeMenu) return;
-          var text = '';
-          try {
-            text = contents.window.getSelection().toString();
-          } catch (e) {}
-          if (text && text.trim().length) {
-            suppressTapUntil = Date.now() + 400;
-            post({ type: 'selection', text: text.trim(), cfiRange: cfiRange, anchor: cfiRange });
-          }
-        });
-
         // A page turn invalidates the painted rects, so drop the selection.
         rendition.on('relocated', function () {
           if (selCur) selClear(false);
@@ -2278,17 +2313,36 @@ return ctor.prototype=parent.prototype,child.prototype=new ctor,child.__super__=
       });
     },
 
-    setNativeMenu: function (enabled) {
-      allowNativeMenu = !!enabled;
-      // Opting into the OS menu means giving the platform its selection back:
-      // drop our user-select:none clamp and any overlay we're currently drawing.
-      selClear(true);
-      selHosts.forEach(function (h) {
-        var body = h.doc.body || h.doc.documentElement;
-        if (!body) return;
-        if (allowNativeMenu) body.classList.remove('rp-nosel');
-        else body.classList.add('rp-nosel');
-      });
+    /**
+     * Select the whole of what's currently on screen — the chapter, the reflow
+     * article, or the current PDF page's text layer. This is the "Select all"
+     * the OS menu would have given us, which our own selection engine
+     * necessarily suppresses.
+     */
+    selectAll: function () {
+      var host = (selCur && selCur.host) || selLastHost || selHosts[selHosts.length - 1];
+      if (!host) return;
+      var root = null;
+      if (host.kind === 'reflow') {
+        root = document.getElementById('rp-article');
+      } else if (host.kind === 'pdf') {
+        var page =
+          pdf.pagesEl &&
+          pdf.pagesEl.querySelector('.pdf-page[data-page="' + pdf.current + '"] .textLayer');
+        root = page;
+      } else {
+        root = host.doc.body || host.doc.documentElement;
+      }
+      if (!root) return;
+      try {
+        var r = host.doc.createRange();
+        r.selectNodeContents(root);
+        if (!String(r.toString()).trim()) return;
+        selCur = { host: host, range: r };
+        selDrag = null;
+        selPaint();
+        selPost();
+      } catch (e) {}
     },
 
     search: function (query) {

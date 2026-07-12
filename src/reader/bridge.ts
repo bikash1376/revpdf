@@ -184,7 +184,8 @@ export const cmd = {
   renderHighlights: (items: { id: string; cfiRange: string; color: string }[]) =>
     call('renderHighlights', items),
   clearAllHighlights: () => call('clearAllHighlights'),
-  setNativeMenu: (enabled: boolean) => call('setNativeMenu', enabled),
+  /** "Select all" — the OS menu action our own selection engine has to suppress. */
+  selectAll: () => call('selectAll'),
   /** HTML File/Browser tabs: 'rendered' = the page, 'source' = highlighted markup. */
   setViewMode: (view: ReaderViewMode) => call('setViewMode', view),
   convertPdfToEpub: (base64: string, title: string) =>

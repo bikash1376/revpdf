@@ -18,14 +18,37 @@ export type ReadingMode = 'paginated' | 'scroll';
 export type TextAlign = 'justify' | 'left' | 'center' | 'right';
 export type OpenLinksIn = 'in-app' | 'external';
 
+/**
+ * `headerTrim` is how many CSS px of the engine's own chrome — logo, search box,
+ * the query you already know you typed — sit above the first result. The
+ * selection sheet scrolls past it so it opens *on* the results. Each engine
+ * wastes a different amount of room, hence a value per engine rather than one
+ * constant.
+ */
 export const SEARCH_ENGINES: Record<
   Exclude<SearchEngine, 'disabled'>,
-  { label: string; url: (q: string) => string }
+  { label: string; url: (q: string) => string; headerTrim: number }
 > = {
-  google: { label: 'Google', url: (q) => `https://www.google.com/search?q=${q}` },
-  duckduckgo: { label: 'DuckDuckGo', url: (q) => `https://duckduckgo.com/?q=${q}` },
-  yandex: { label: 'Yandex', url: (q) => `https://yandex.com/search/?text=${q}` },
-  yahoo: { label: 'Yahoo', url: (q) => `https://search.yahoo.com/search?p=${q}` },
+  google: {
+    label: 'Google',
+    url: (q) => `https://www.google.com/search?q=${q}`,
+    headerTrim: 190,
+  },
+  duckduckgo: {
+    label: 'DuckDuckGo',
+    url: (q) => `https://duckduckgo.com/?q=${q}`,
+    headerTrim: 130,
+  },
+  yandex: {
+    label: 'Yandex',
+    url: (q) => `https://yandex.com/search/?text=${q}`,
+    headerTrim: 160,
+  },
+  yahoo: {
+    label: 'Yahoo',
+    url: (q) => `https://search.yahoo.com/search?p=${q}`,
+    headerTrim: 170,
+  },
 };
 
 export type SettingsState = {
@@ -41,8 +64,6 @@ export type SettingsState = {
   bottomSheetEnabled: boolean;
   searchEngine: SearchEngine;
   openLinksIn: OpenLinksIn; // where result links open: in-app mini browser or system browser
-  nativeSelectionMenu: boolean; // show the OS copy/paste/share menu on text selection
-  selectionPeekHeight: number; // px height the selection sheet peeks to on open
 
   // reader behavior
   readingMode: ReadingMode;
@@ -78,8 +99,6 @@ export const useSettings = create<SettingsState>()(
       bottomSheetEnabled: true,
       searchEngine: 'google',
       openLinksIn: 'in-app',
-      nativeSelectionMenu: false,
-      selectionPeekHeight: 168,
 
       readingMode: 'scroll',
 

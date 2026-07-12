@@ -1,13 +1,12 @@
-import Slider from '@react-native-community/slider';
 import Constants from 'expo-constants';
 import { Image } from 'expo-image';
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { ScrollView, StyleSheet, View } from 'react-native';
-import { Appbar, Divider, List, SegmentedButtons, Switch, Text, useTheme } from 'react-native-paper';
+import { Appbar, Divider, List, SegmentedButtons, Text, useTheme } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { SEARCH_ENGINES, useSettings } from '@/store/settings';
+import { useSettings } from '@/store/settings';
 import { spacing } from '@/theme/tokens';
 import { wordmark } from '@/theme/wordmark';
 
@@ -17,9 +16,6 @@ export default function SettingsScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const s = useSettings();
-
-  const searchLabel =
-    s.searchEngine === 'disabled' ? 'Disabled' : SEARCH_ENGINES[s.searchEngine].label;
 
   return (
     <View style={[styles.screen, { backgroundColor: theme.colors.background }]}>
@@ -42,130 +38,17 @@ export default function SettingsScreen() {
           />
         </View>
 
+        {/* Everything you change *while reading* — theme, font, reading mode,
+            highlighting, search engine — lives in Reader settings, one tap from
+            the page. This screen keeps only what you set once. */}
         <List.Item
-          title="Reader display controls"
-          description="Font, size, alignment, spacing, margins, brightness"
+          title="Reader settings"
+          description="Theme, font, spacing, brightness · reading mode, highlighting, search"
+          descriptionNumberOfLines={2}
           left={(p) => <List.Icon {...p} icon="format-font" />}
           right={(p) => <List.Icon {...p} icon="chevron-right" />}
           onPress={() => router.push('/settings/reader')}
         />
-
-        <Divider />
-        <List.Subheader>Selection &amp; search</List.Subheader>
-
-        <List.Item
-          title="Highlighting"
-          description="Long-press text to highlight and pick a color"
-          left={(p) => <List.Icon {...p} icon="marker" />}
-          right={() => (
-            <Switch
-              value={s.highlightingEnabled}
-              onValueChange={(v) => s.set('highlightingEnabled', v)}
-            />
-          )}
-        />
-
-        <List.Item
-          title="Selection bottom sheet"
-          description="Show a search sheet when you select text"
-          left={(p) => <List.Icon {...p} icon="dock-bottom" />}
-          right={() => (
-            <Switch
-              value={s.bottomSheetEnabled}
-              onValueChange={(v) => s.set('bottomSheetEnabled', v)}
-            />
-          )}
-        />
-
-        <List.Item
-          title="Search engine"
-          description={searchLabel}
-          left={(p) => <List.Icon {...p} icon="magnify" />}
-          right={(p) => <List.Icon {...p} icon="chevron-right" />}
-          onPress={() => router.push('/settings/search')}
-        />
-
-        <View style={styles.indent}>
-          <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>
-            Open links
-          </Text>
-          <SegmentedButtons
-            value={s.openLinksIn}
-            onValueChange={(v) => s.set('openLinksIn', v as typeof s.openLinksIn)}
-            style={styles.segmentInline}
-            buttons={[
-              { value: 'in-app', label: 'In app', icon: 'application-outline' },
-              { value: 'external', label: 'Browser', icon: 'open-in-new' },
-            ]}
-          />
-          <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-            Where result links open: a mini browser inside revpdf, or your phone’s browser.
-          </Text>
-        </View>
-
-        <List.Item
-          title="Native selection menu"
-          description="Also show Android’s copy / share menu when you select text"
-          left={(p) => <List.Icon {...p} icon="content-copy" />}
-          right={() => (
-            <Switch
-              value={s.nativeSelectionMenu}
-              onValueChange={(v) => s.set('nativeSelectionMenu', v)}
-            />
-          )}
-        />
-
-        <View style={styles.indent}>
-          <View style={styles.peekHeader}>
-            <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>
-              Selection sheet height
-            </Text>
-            <Text variant="labelLarge" style={{ color: theme.colors.onSurfaceVariant }}>
-              {s.selectionPeekHeight}px
-            </Text>
-          </View>
-          <Slider
-            minimumValue={120}
-            maximumValue={360}
-            step={4}
-            value={s.selectionPeekHeight}
-            onValueChange={(v) => s.set('selectionPeekHeight', Math.round(v))}
-            minimumTrackTintColor={theme.colors.primary}
-            maximumTrackTintColor={theme.colors.surfaceVariant}
-            thumbTintColor={theme.colors.primary}
-          />
-          {/* Realtime preview: a mock sheet at the chosen peek height. */}
-          <View
-            style={[
-              styles.peekPreview,
-              {
-                height: Math.min(s.selectionPeekHeight, 240),
-                backgroundColor: theme.colors.surfaceVariant,
-              },
-            ]}>
-            <View style={[styles.peekHandle, { backgroundColor: theme.colors.onSurfaceVariant }]} />
-            <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-              “Selected text” — colors &amp; search results appear here
-            </Text>
-          </View>
-          <Text variant="bodySmall" style={{ color: theme.colors.onSurfaceVariant }}>
-            How much of the selection sheet shows when you select text. Drag its handle higher (up to
-            half the screen) for more.
-          </Text>
-        </View>
-
-        <Divider />
-        <List.Subheader>Reading</List.Subheader>
-        <View style={styles.segmentWrap}>
-          <SegmentedButtons
-            value={s.readingMode}
-            onValueChange={(v) => s.set('readingMode', v as typeof s.readingMode)}
-            buttons={[
-              { value: 'paginated', label: 'Paginated', icon: 'book-open-outline' },
-              { value: 'scroll', label: 'Scroll', icon: 'arrow-down' },
-            ]}
-          />
-        </View>
 
         <Divider />
         <View style={styles.aboutLogo}>
@@ -179,7 +62,7 @@ export default function SettingsScreen() {
         />
         <List.Item
           title="Supported formats"
-          description="Reads PDF and EPUB. DOCX, Markdown, TXT, HTML, JSON and CSV are planned."
+          description="PDF, EPUB, DOCX, Markdown, TXT, HTML, JSON and CSV. Legacy .doc isn’t supported — save it as .docx."
           descriptionNumberOfLines={3}
           left={(p) => <List.Icon {...p} icon="file-multiple-outline" />}
         />
@@ -218,25 +101,6 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1 },
   segmentWrap: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
-  segmentInline: { marginVertical: spacing.sm },
-  indent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.md, gap: 4 },
-  peekHeader: { flexDirection: 'row', justifyContent: 'space-between' },
-  peekPreview: {
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    marginTop: spacing.xs,
-    overflow: 'hidden',
-  },
-  peekHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    alignSelf: 'center',
-    opacity: 0.6,
-    marginBottom: spacing.sm,
-  },
   aboutLogo: { alignItems: 'center', paddingTop: spacing.lg, paddingBottom: spacing.xs },
   logo: { width: 168, height: 45 },
   builtBy: { textAlign: 'center', marginTop: spacing.lg },

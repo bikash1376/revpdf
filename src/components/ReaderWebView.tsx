@@ -37,6 +37,7 @@ export type ReaderHandle = {
   removeHighlight: (id: string) => void;
   clearAllHighlights: () => void;
   clearSelection: () => void;
+  selectAll: () => void;
   setViewMode: (view: ReaderViewMode) => void;
 };
 
@@ -122,6 +123,7 @@ export const ReaderWebView = forwardRef<ReaderHandle, Props>(function ReaderWebV
     removeHighlight: (id) => webRef.current?.injectJavaScript(cmd.removeHighlight(id)),
     clearAllHighlights: () => webRef.current?.injectJavaScript(cmd.clearAllHighlights()),
     clearSelection: () => webRef.current?.injectJavaScript(cmd.clearSelection()),
+    selectAll: () => webRef.current?.injectJavaScript(cmd.selectAll()),
     setViewMode: (view) => webRef.current?.injectJavaScript(cmd.setViewMode(view)),
   }));
 
@@ -136,12 +138,6 @@ export const ReaderWebView = forwardRef<ReaderHandle, Props>(function ReaderWebV
   useEffect(() => {
     if (ready.current) webRef.current?.injectJavaScript(cmd.applyTypography(typography));
   }, [typography]);
-
-  // Push the native-selection-menu preference whenever it changes.
-  useEffect(() => {
-    if (ready.current)
-      webRef.current?.injectJavaScript(cmd.setNativeMenu(settings.nativeSelectionMenu));
-  }, [settings.nativeSelectionMenu]);
 
   // Keep the WebView's highlight overlays in sync with the DB-backed list. Runs
   // once the engine is loaded and whenever the list changes (add, recolor,
@@ -170,7 +166,6 @@ export const ReaderWebView = forwardRef<ReaderHandle, Props>(function ReaderWebV
     ready.current = true;
     webRef.current?.injectJavaScript(cmd.applyTheme(theme));
     webRef.current?.injectJavaScript(cmd.applyTypography(typography));
-    webRef.current?.injectJavaScript(cmd.setNativeMenu(settings.nativeSelectionMenu));
     // Guard against loading a document large enough to OOM-crash the WebView:
     // the whole file is base64-encoded and decoded into memory below.
     if (doc.size_bytes > MAX_DOCUMENT_BYTES) {

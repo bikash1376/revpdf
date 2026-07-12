@@ -1,18 +1,13 @@
 import BottomSheet, { BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, Dimensions, Linking, Pressable, StyleSheet, View } from 'react-native';
+import { BackHandler, Dimensions, Linking, StyleSheet, View } from 'react-native';
 import { ActivityIndicator, IconButton, Text, useTheme } from 'react-native-paper';
 import { WebView, type WebViewNavigation } from 'react-native-webview';
 
 import { SEARCH_ENGINES, type OpenLinksIn, type SearchEngine } from '@/store/settings';
-import { highlightColors } from '@/theme/tokens';
 
 const SCREEN_H = Dimensions.get('window').height;
-
-// Fallback peek height (user-configurable via settings) that comfortably shows
-// the handle + header row + the highlight swatch row.
-const DEFAULT_PEEK = 168;
 
 export type Selection = { text: string; cfiRange: string };
 
@@ -20,21 +15,13 @@ type Props = {
   selection: Selection | null;
   /**
    * Whether the sheet is raised. When false but `selection` is set, the sheet
-   * stays mounted just off-screen so its WebView loads the search results in the
+   * stays mounted just off-screen so its WebView loads the results in the
    * background — tapping the search action then raises a sheet that's already
    * populated instead of a spinner.
    */
   open: boolean;
   searchEngine: SearchEngine;
   openLinksIn: OpenLinksIn;
-  highlightingEnabled: boolean;
-  canHighlight: boolean;
-  /** Peek height (px) the sheet opens to — user-customizable in settings. */
-  peekHeight?: number;
-  /** True when the selection is an existing highlight being edited (show delete). */
-  canDelete?: boolean;
-  onHighlight: (color: string) => void;
-  onDelete?: () => void;
   onDismiss: () => void;
 };
 
@@ -47,9 +34,44 @@ function hostOf(u: string): string {
 }
 
 /**
- * Chrome-style selection sheet (spec §7.12). On selection it opens at a peek
- * showing the selected text + highlight colors, with search results already
- * loaded underneath. Drag the handle to a middle breakpoint (hold) or full.
+ * Open the sheet *on the results* (SPEC4 §8).
+ *
+ * A search engine spends the top of its page on a logo, a search box and the
+ * query you just typed — all of which you already know. In a half-height sheet
+ * that's most of the visible area. So we scroll past it.
+ *
+ * Two mechanisms, because the chrome comes in two kinds. `headerTrim` (a
+ * per-engine px offset — they each waste a different amount) scrolls the static
+ * masthead out of the way. The generic sweep then hides anything that computes
+ * to fixed/sticky and is pinned to the top, which is what the engines use for
+ * the search bar that would otherwise follow us down. Selector-free, so an
+ * engine reskinning its results page degrades to the old behaviour rather than
+ * breaking the sheet.
+ */
+function trimScript(px: number) {
+  return `(function(){
+    function trim(){
+      try {
+        document.querySelectorAll('body *').forEach(function(el){
+          var p = getComputedStyle(el).position;
+          if ((p === 'fixed' || p === 'sticky') && el.getBoundingClientRect().top < 8
+              && el.offsetHeight > 0 && el.offsetHeight < 240) {
+            el.style.display = 'none';
+          }
+        });
+        window.scrollTo(0, ${px});
+      } catch (e) {}
+    }
+    trim();
+    // Results pages hydrate late, so re-apply as the layout settles.
+    setTimeout(trim, 300);
+    setTimeout(trim, 900);
+    setTimeout(trim, 1800);
+  })(); true;`;
+}
+
+/**
+ * Selection → search sheet. Raised by the search action, already loaded.
  * Result links act like a mini in-app browser; back steps through history and
  * finally returns to the reader.
  */
@@ -58,36 +80,28 @@ export function SelectionSheet({
   open,
   searchEngine,
   openLinksIn,
-  highlightingEnabled,
-  canHighlight,
-  peekHeight,
-  canDelete,
-  onHighlight,
-  onDelete,
   onDismiss,
 }: Props) {
   const theme = useTheme();
   const sheetRef = useRef<BottomSheet>(null);
   const webRef = useRef<WebView>(null);
   const [canGoBack, setCanGoBack] = useState(false);
-  // The sheet also sits at index -1 while it's prefetching, and that isn't a
+  // The sheet also sits at index -1 while prefetching, and that isn't a
   // dismissal — so only treat a close as one once it has actually been raised.
   const raised = useRef(false);
 
   const searchEnabled = searchEngine !== 'disabled';
+  const engine = searchEnabled ? SEARCH_ENGINES[searchEngine] : null;
   const url = useMemo(() => {
-    if (!selection || !searchEnabled) return null;
-    return SEARCH_ENGINES[searchEngine].url(encodeURIComponent(selection.text));
-  }, [selection, searchEngine, searchEnabled]);
+    if (!selection || !engine) return null;
+    return engine.url(encodeURIComponent(selection.text));
+  }, [selection, engine]);
   const searchHost = useMemo(() => (url ? hostOf(url) : ''), [url]);
 
-  const peek = Math.max(96, Math.round(peekHeight ?? DEFAULT_PEEK));
-  // With search: peek → half (the maximum; the sheet never takes the full
-  // screen). Highlight-only (no search): a single compact snap so there's no
-  // blank area to drag into.
-  const snapPoints = useMemo(() => (url ? [peek, '50%'] : [peek]), [url, peek]);
+  // One snap point: the sheet opens straight to its full height. It used to open
+  // at a peek and expect the reader to drag it up to see anything.
+  const snapPoints = useMemo(() => ['55%'], []);
 
-  // Tapping anywhere outside the sheet closes it instantly (same as the X).
   const renderBackdrop = useCallback(
     (props: React.ComponentProps<typeof BottomSheetBackdrop>) => (
       <BottomSheetBackdrop
@@ -133,8 +147,6 @@ export function SelectionSheet({
 
   const onNav = useCallback((s: WebViewNavigation) => setCanGoBack(s.canGoBack), []);
 
-  // Open a tapped result link: in-app Custom Tab (reliable mini browser, back
-  // returns here) or the system browser, per the user's setting.
   const openLink = useCallback(
     (target: string) => {
       if (openLinksIn === 'external') Linking.openURL(target).catch(() => {});
@@ -143,8 +155,8 @@ export function SelectionSheet({
     [openLinksIn],
   );
 
-  // Keep the search engine's own pages inside the sheet (query + pagination);
-  // hand result links off to openLink so a tap always does something.
+  // Keep the engine's own pages inside the sheet (query + pagination); hand
+  // result links off so a tap always does something.
   const onShouldStart = useCallback(
     (req: { url: string }) => {
       if (!url) return true;
@@ -157,7 +169,6 @@ export function SelectionSheet({
     [url, searchHost, openLink],
   );
 
-  // Result links often use target="_blank"; route those through openLink too.
   const onOpenWindow = useCallback(
     (e: { nativeEvent: { targetUrl: string } }) => {
       const target = e.nativeEvent?.targetUrl;
@@ -166,23 +177,23 @@ export function SelectionSheet({
     [openLink],
   );
 
-  // Fully unmount when there's nothing selected — otherwise an empty sheet stays
-  // mounted and can be dragged up from the bottom even when the feature is off.
-  if (!selection) return null;
+  // Fully unmount when nothing is selected, so an empty sheet can't be dragged
+  // up from the bottom when the feature is off.
+  if (!selection || !url || !engine) return null;
 
-  const showHighlight = highlightingEnabled && canHighlight;
+  const trim = trimScript(engine.headerTrim);
 
   return (
     <BottomSheet
       ref={sheetRef}
-      // Starts closed: the search WebView below still mounts and loads, which is
-      // what makes the results already be there when the sheet is raised.
+      // Starts closed: the WebView below still mounts and loads, which is what
+      // makes the results already be there when the sheet is raised.
       index={-1}
       snapPoints={snapPoints}
       enableDynamicSizing={false}
       enablePanDownToClose
-      // Drag only via the handle so touches on the results page scroll the page
-      // (and don't trigger the OS text-selection menu) instead of moving the sheet.
+      // Drag only via the handle, so touches on the results scroll the page
+      // instead of moving the sheet.
       enableContentPanningGesture={false}
       onClose={handleClose}
       backdropComponent={renderBackdrop}
@@ -202,16 +213,14 @@ export function SelectionSheet({
             variant="titleSmall"
             numberOfLines={1}
             style={[styles.headerText, { color: theme.colors.onSurface }]}>
-            {selection.text ? `“${selection.text}”` : 'Highlight'}
+            {`“${selection.text}”`}
           </Text>
-          {url ? (
-            <IconButton
-              icon="open-in-new"
-              size={22}
-              onPress={() => WebBrowser.openBrowserAsync(url).catch(() => {})}
-              style={styles.headerIcon}
-            />
-          ) : null}
+          <IconButton
+            icon="open-in-new"
+            size={22}
+            onPress={() => WebBrowser.openBrowserAsync(url).catch(() => {})}
+            style={styles.headerIcon}
+          />
           <IconButton
             icon="close"
             size={22}
@@ -220,52 +229,27 @@ export function SelectionSheet({
           />
         </View>
 
-        {showHighlight ? (
-          <View style={styles.swatches}>
-            {highlightColors.map((c) => (
-              <Pressable
-                key={c.key}
-                onPress={() => onHighlight(c.value)}
-                hitSlop={6}
-                style={[styles.swatch, { backgroundColor: c.value, borderColor: theme.colors.outline }]}
-              />
-            ))}
-            {canDelete && onDelete ? (
-              <Pressable
-                onPress={onDelete}
-                hitSlop={6}
-                style={[styles.swatch, styles.deleteSwatch, { borderColor: theme.colors.outline }]}>
-                <IconButton
-                  icon="trash-can-outline"
-                  size={18}
-                  iconColor={theme.colors.error}
-                  style={styles.deleteIcon}
-                  pointerEvents="none"
-                />
-              </Pressable>
-            ) : null}
-          </View>
-        ) : null}
-
-        {url ? (
-          <View style={styles.webWrap}>
-            <WebView
-              ref={webRef}
-              source={{ uri: url }}
-              style={styles.web}
-              onNavigationStateChange={onNav}
-              onShouldStartLoadWithRequest={onShouldStart}
-              onOpenWindow={onOpenWindow}
-              setSupportMultipleWindows
-              startInLoadingState
-              renderLoading={() => (
-                <View style={styles.loading}>
-                  <ActivityIndicator />
-                </View>
-              )}
-            />
-          </View>
-        ) : null}
+        <View style={styles.webWrap}>
+          <WebView
+            ref={webRef}
+            source={{ uri: url }}
+            style={styles.web}
+            onNavigationStateChange={onNav}
+            onShouldStartLoadWithRequest={onShouldStart}
+            onOpenWindow={onOpenWindow}
+            setSupportMultipleWindows
+            // Runs on every navigation, so pagination and "related searches"
+            // land on the results too — not just the first load.
+            injectedJavaScript={trim}
+            onLoadEnd={() => webRef.current?.injectJavaScript(trim)}
+            startInLoadingState
+            renderLoading={() => (
+              <View style={styles.loading}>
+                <ActivityIndicator />
+              </View>
+            )}
+          />
+        </View>
       </BottomSheetView>
     </BottomSheet>
   );
@@ -282,17 +266,7 @@ const styles = StyleSheet.create({
   },
   headerIcon: { margin: 0 },
   headerText: { flex: 1 },
-  swatches: {
-    flexDirection: 'row',
-    gap: 14,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    paddingTop: 4,
-  },
-  swatch: { width: 30, height: 30, borderRadius: 15, borderWidth: StyleSheet.hairlineWidth },
-  deleteSwatch: { alignItems: 'center', justifyContent: 'center', backgroundColor: 'transparent' },
-  deleteIcon: { margin: 0 },
-  webWrap: { flex: 1, minHeight: SCREEN_H * 0.5, width: '100%' },
+  webWrap: { flex: 1, minHeight: SCREEN_H * 0.45, width: '100%' },
   web: { flex: 1, backgroundColor: 'transparent' },
   loading: { ...StyleSheet.absoluteFillObject, alignItems: 'center', justifyContent: 'center' },
 });

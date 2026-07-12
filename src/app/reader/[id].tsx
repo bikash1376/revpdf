@@ -1,7 +1,8 @@
 import * as Brightness from 'expo-brightness';
+import * as Clipboard from 'expo-clipboard';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, Share, StyleSheet, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import {
   Appbar,
@@ -15,6 +16,7 @@ import {
 } from 'react-native-paper';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { HighlightEditor } from '@/components/HighlightEditor';
 import { ReaderWebView, type ReaderHandle } from '@/components/ReaderWebView';
 import { SelectionActions } from '@/components/SelectionActions';
 import { SelectionSheet } from '@/components/SelectionSheet';
@@ -159,12 +161,12 @@ export default function ReaderScreen() {
         }
         break;
       case 'highlightTapped':
-        // Tapped an existing highlight → raise the sheet straight to its
-        // recolor / delete row (no action buttons in this mode).
+        // Tapped an existing highlight → swap the action cluster for the
+        // recolor / delete bar. The search sheet stays out of it.
         if (!settings.highlightingEnabled) break;
         setEditingHl(msg.id);
+        setSheetOpen(false);
         setSelection({ text: '', cfiRange: msg.cfiRange, anchor: msg.cfiRange, rect: NO_RECT });
-        setSheetOpen(true);
         break;
       case 'selectionCleared':
         setSelection(null);
@@ -233,6 +235,27 @@ export default function ReaderScreen() {
     setEditingHl(null);
     setSheetOpen(false);
   };
+
+  // Copy / Share / Select all. The custom selection engine has to suppress
+  // Android's own selection bar in order to draw its handles, so these three
+  // actions are ours to provide.
+  const doCopy = async () => {
+    if (!selection?.text) return;
+    await Clipboard.setStringAsync(selection.text);
+    dismissSelection();
+    setError('Copied to clipboard');
+  };
+
+  const doShare = async () => {
+    if (!selection?.text) return;
+    try {
+      await Share.share({ message: selection.text });
+    } catch {
+      // user dismissed the share sheet
+    }
+  };
+
+  const doSelectAll = () => readerRef.current?.selectAll();
 
   const closeFind = () => {
     setFindActive(false);
@@ -383,36 +406,41 @@ export default function ReaderScreen() {
         {error ?? ''}
       </Snackbar>
 
-      {/* Floating actions over the selection: one-tap highlight, and the search
-          button whose sheet is already loading underneath. */}
+      {/* Selection actions, parked bottom-right so they never sit on top of the
+          words you're reading. Reader-themed, not app-themed. */}
       {selection && !editingHl && !sheetOpen && (
         <SelectionActions
-          rect={selection.rect}
-          insetTop={insets.top}
-          insetLeft={insets.left}
+          readerTheme={settings.readerTheme}
+          bottomInset={insets.bottom}
           showHighlight={settings.highlightingEnabled && canHighlight}
           showSearch={settings.bottomSheetEnabled && settings.searchEngine !== 'disabled'}
           highlightColor={defaultHighlight}
           onHighlight={() => doHighlight(defaultHighlight)}
           onSearch={() => setSheetOpen(true)}
+          onCopy={doCopy}
+          onShare={doShare}
+          onSelectAll={doSelectAll}
         />
       )}
 
-      {/* Chrome-style selection → search sheet. Mounted as soon as there's a
-          selection so its results load in the background; raised on demand. */}
+      {/* Tapped an existing highlight: recolor / delete, in the same spot. */}
+      {selection && editingHl && (
+        <HighlightEditor
+          readerTheme={settings.readerTheme}
+          bottomInset={insets.bottom}
+          current={highlights.find((h) => h.id === editingHl)?.color}
+          onPick={doHighlight}
+          onDelete={doDeleteHighlight}
+        />
+      )}
+
+      {/* Search sheet. Mounts as soon as there's a selection so its results load
+          in the background; the search action raises it, already full. */}
       <SelectionSheet
-        selection={settings.bottomSheetEnabled || settings.highlightingEnabled ? selection : null}
+        selection={settings.bottomSheetEnabled && !editingHl ? selection : null}
         open={sheetOpen}
-        searchEngine={
-          editingHl ? 'disabled' : settings.bottomSheetEnabled ? settings.searchEngine : 'disabled'
-        }
+        searchEngine={settings.bottomSheetEnabled ? settings.searchEngine : 'disabled'}
         openLinksIn={settings.openLinksIn}
-        highlightingEnabled={settings.highlightingEnabled}
-        canHighlight={canHighlight}
-        peekHeight={settings.selectionPeekHeight}
-        canDelete={!!editingHl}
-        onHighlight={doHighlight}
-        onDelete={doDeleteHighlight}
         onDismiss={dismissSelection}
       />
     </View>
