@@ -39,7 +39,6 @@ export default function RootLayout() {
               <Stack.Screen name="index" />
               <Stack.Screen name="document/[id]" />
               <Stack.Screen name="reader/[id]" options={{ animation: 'fade' }} />
-              <Stack.Screen name="onboarding" options={{ animation: 'slide_from_bottom' }} />
               <Stack.Screen name="settings/index" />
               <Stack.Screen name="settings/reader" />
               <Stack.Screen name="settings/search" />

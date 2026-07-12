@@ -4,6 +4,9 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import type { ReaderThemeName } from '@/theme/tokens';
 import { highlightColors, readerSurfaces, spacing } from '@/theme/tokens';
 
+// Matches the selection cluster, so the two swap in place.
+const LIFT = 38;
+
 /**
  * Recolour / delete an existing highlight (SPEC4 §7).
  *
@@ -27,15 +30,17 @@ export function HighlightEditor({
   onDelete: () => void;
 }) {
   const surface = readerSurfaces[readerTheme];
+  // Inverted against the page, matching the selection actions.
+  const bg = surface.text;
+  const fg = surface.background;
 
   return (
     <View
       style={[
         styles.bar,
         {
-          bottom: bottomInset + spacing.lg,
-          backgroundColor: surface.surface,
-          borderColor: surface.outline,
+          bottom: bottomInset + LIFT,
+          backgroundColor: bg,
         },
       ]}>
       <ScrollView
@@ -52,7 +57,7 @@ export function HighlightEditor({
               styles.swatch,
               {
                 backgroundColor: c.value,
-                borderColor: current === c.value ? surface.text : 'transparent',
+                borderColor: current === c.value ? fg : 'transparent',
                 borderWidth: current === c.value ? 2.5 : 0,
               },
             ]}
@@ -60,10 +65,10 @@ export function HighlightEditor({
         ))}
       </ScrollView>
 
-      <View style={[styles.sep, { backgroundColor: surface.outline }]} />
+      <View style={[styles.sep, { backgroundColor: fg, opacity: 0.3 }]} />
 
       <Pressable onPress={onDelete} hitSlop={6} style={styles.delete}>
-        <MaterialCommunityIcons name="trash-can-outline" size={22} color={surface.text} />
+        <MaterialCommunityIcons name="trash-can-outline" size={22} color={fg} />
       </Pressable>
     </View>
   );
@@ -77,7 +82,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: 28,
-    borderWidth: StyleSheet.hairlineWidth,
     paddingLeft: spacing.sm,
     paddingRight: spacing.xs,
     height: 56,

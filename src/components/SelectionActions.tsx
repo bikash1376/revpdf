@@ -17,6 +17,9 @@ import { readerSurfaces, spacing } from '@/theme/tokens';
 const BTN = 48;
 const GAP = 12;
 const RING = 2.5;
+// Sits clear of the nav bar and the reader's own bottom chrome, so it's an easy
+// thumb reach rather than something you have to stretch down for.
+const LIFT = 38;
 
 type Props = {
   /** Drives the button colours — the READER surface, never the app theme. */
@@ -100,32 +103,36 @@ export function SelectionActions({
   const [menuOpen, setMenuOpen] = useState(false);
   const surface = readerSurfaces[readerTheme];
 
+  // Inverted against the page, not matched to it: on a white page the buttons
+  // are black with white icons, on a black page white with black icons. A button
+  // the same colour as the paper it sits on disappears into it.
+  const bg = surface.text;
+  const fg = surface.background;
+
   const run = (fn: () => void) => () => {
     setMenuOpen(false);
     fn();
   };
 
   return (
-    <View
-      style={[styles.cluster, { bottom: bottomInset + spacing.lg }]}
-      pointerEvents="box-none">
+    <View style={[styles.cluster, { bottom: bottomInset + LIFT }]} pointerEvents="box-none">
       {showHighlight && (
         <Pressable
           onPress={onHighlight}
-          style={[styles.btn, { backgroundColor: surface.surface, borderColor: surface.outline }]}
-          android_ripple={{ color: surface.text, borderless: true }}>
-          <MaterialCommunityIcons name="marker" size={23} color={surface.text} />
-          <View style={[styles.swatch, { backgroundColor: highlightColor }]} />
+          style={[styles.btn, { backgroundColor: bg }]}
+          android_ripple={{ color: fg, borderless: true }}>
+          <MaterialCommunityIcons name="marker" size={23} color={fg} />
+          <View style={[styles.swatch, { backgroundColor: highlightColor, borderColor: bg }]} />
         </Pressable>
       )}
 
       {showSearch && (
         <Pressable
           onPress={onSearch}
-          style={[styles.btn, { backgroundColor: surface.surface, borderColor: surface.outline }]}
-          android_ripple={{ color: surface.text, borderless: true }}>
-          <RevolvingRing surface={surface.surface} />
-          <MaterialCommunityIcons name="web" size={23} color={surface.text} />
+          style={[styles.btn, { backgroundColor: bg }]}
+          android_ripple={{ color: fg, borderless: true }}>
+          <RevolvingRing surface={bg} />
+          <MaterialCommunityIcons name="web" size={23} color={fg} />
         </Pressable>
       )}
 
@@ -135,9 +142,9 @@ export function SelectionActions({
         anchor={
           <Pressable
             onPress={() => setMenuOpen(true)}
-            style={[styles.btn, { backgroundColor: surface.surface, borderColor: surface.outline }]}
-            android_ripple={{ color: surface.text, borderless: true }}>
-            <MaterialCommunityIcons name="dots-vertical" size={23} color={surface.text} />
+            style={[styles.btn, { backgroundColor: bg }]}
+            android_ripple={{ color: fg, borderless: true }}>
+            <MaterialCommunityIcons name="dots-vertical" size={23} color={fg} />
           </Pressable>
         }>
         <Menu.Item leadingIcon="content-copy" title="Copy" onPress={run(onCopy)} />
@@ -163,7 +170,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    borderWidth: StyleSheet.hairlineWidth,
     // Reader surfaces are flat colours, so lift the cluster off the page with a
     // shadow rather than an MD3 elevation tint (which would fight the theme).
     elevation: 6,
@@ -191,10 +197,11 @@ const styles = StyleSheet.create({
   },
   swatch: {
     position: 'absolute',
-    right: 9,
-    bottom: 9,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    right: 8,
+    bottom: 8,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    borderWidth: 1.5,
   },
 });

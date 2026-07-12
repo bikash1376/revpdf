@@ -1,6 +1,7 @@
+import * as DocumentPicker from 'expo-document-picker';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { BackHandler, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import {
   Appbar,
@@ -17,10 +18,14 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DocumentListItem } from '@/components/DocumentListItem';
-import { FirstRun } from '@/components/onboarding/FirstRun';
+import {
+  PdfToEpubConverter,
+  type ConvertProgress,
+} from '@/components/PdfToEpubConverter';
+import { ConvertOverlay } from '@/components/onboarding/ConvertOverlay';
+import { FunFact } from '@/components/onboarding/FunFact';
 import type { DocumentRow } from '@/db';
 import { useLibrary } from '@/store/library';
-import { useSettings } from '@/store/settings';
 import { spacing } from '@/theme/tokens';
 import { wordmark } from '@/theme/wordmark';
 
@@ -35,18 +40,35 @@ export default function LibraryScreen() {
   const [menuDoc, setMenuDoc] = useState<DocumentRow | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const settings = useSettings();
-  // The first-run pitch stands in for the empty state exactly once, and only
-  // after the persisted settings have hydrated (otherwise it would flash on
-  // every cold start before we know whether it's already been seen).
-  const showFirstRun =
-    settings._hydrated && !settings.onboardingSeen && !loading && documents.length === 0;
+  // PDF → EPUB conversion. `source` being set is what puts the overlay up.
+  const [source, setSource] = useState<{ uri: string; title: string } | null>(null);
+  const [progress, setProgress] = useState<ConvertProgress>({ progress: 0, stage: '' });
+  const [convertedId, setConvertedId] = useState<string | null>(null);
 
-  // Seeing it counts as having seen it — this is the "first open" screen, not a
-  // screen that nags until the user converts something.
-  useEffect(() => {
-    if (showFirstRun) settings.set('onboardingSeen', true);
-  }, [showFirstRun, settings]);
+  const pickPdfToConvert = async () => {
+    const res = await DocumentPicker.getDocumentAsync({
+      type: 'application/pdf',
+      copyToCacheDirectory: true,
+    });
+    if (res.canceled || !res.assets[0]) return;
+    const a = res.assets[0];
+    setConvertedId(null);
+    setProgress({ progress: 0, stage: '' });
+    setSource({ uri: a.uri, title: a.name.replace(/\.[^.]+$/, '') });
+  };
+
+  const endConversion = useCallback(() => {
+    setSource(null);
+    setConvertedId(null);
+  }, []);
+
+  const handleConvertError = useCallback(
+    (m: string) => {
+      endConversion();
+      setError(m);
+    },
+    [endConversion],
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -101,26 +123,12 @@ export default function LibraryScreen() {
         </Appbar.Header>
       ) : (
         <Appbar.Header elevated>
-          <Appbar.Content title={showFirstRun ? 'Welcome' : 'Welcome back'} />
-          {/* The first-run walkthrough (demo clip + PDF→EPUB conversion) is
-              otherwise unreachable once you have documents. */}
-          <Appbar.Action
-            icon="help-circle-outline"
-            accessibilityLabel="How RevPdf works"
-            onPress={() => router.push('/onboarding')}
-          />
+          <Appbar.Content title="Welcome back" />
           <Appbar.Action icon="magnify" onPress={() => setSearchOpen(true)} />
           <Appbar.Action icon="cog-outline" onPress={() => router.push('/settings')} />
         </Appbar.Header>
       )}
 
-      {showFirstRun ? (
-        <FirstRun
-          onImport={handleImport}
-          onOpen={(id) => router.push(`/reader/${id}`)}
-          onError={setError}
-        />
-      ) : (
       <FlatList
         data={filtered}
         keyExtractor={(d) => d.id}
@@ -158,10 +166,13 @@ export default function LibraryScreen() {
             <Button mode="contained" icon="plus" onPress={handleImport} loading={importing}>
               Add a document
             </Button>
+
+            {/* Only on a genuinely empty shelf — once you have documents, the
+                library is the point of the screen. */}
+            {documents.length === 0 && !query && <FunFact onTryNow={pickPdfToConvert} />}
           </View>
         }
       />
-      )}
 
       {filtered.length > 0 && (
         <FAB
@@ -206,6 +217,26 @@ export default function LibraryScreen() {
           </Dialog.Content>
         </Dialog>
       </Portal>
+
+      {/* Headless: runs the conversion in an off-screen WebView. */}
+      <PdfToEpubConverter
+        source={source}
+        onProgress={setProgress}
+        onDone={setConvertedId}
+        onError={handleConvertError}
+      />
+
+      {source && (
+        <ConvertOverlay
+          progress={progress.progress}
+          documentId={convertedId}
+          onOpen={(docId) => {
+            endConversion();
+            refresh();
+            router.push(`/reader/${docId}`);
+          }}
+        />
+      )}
 
       <Snackbar visible={!!error} onDismiss={() => setError(null)} duration={6000}>
         {error ?? ''}

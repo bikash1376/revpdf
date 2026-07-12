@@ -78,12 +78,6 @@ export type SettingsState = {
   lineSpacing: number; // 0–100 (%)
   brightness: number | null; // 0–1, null = follow system
 
-  /**
-   * The first-run pitch (convert a PDF to EPUB) has been shown. It replaces the
-   * empty state exactly once; after that an empty library gets the plain one.
-   */
-  onboardingSeen: boolean;
-
   _hydrated: boolean;
   set: <K extends keyof SettingsState>(key: K, value: SettingsState[K]) => void;
 };
@@ -110,8 +104,6 @@ export const useSettings = create<SettingsState>()(
       pageMargins: true,
       lineSpacing: 40,
       brightness: null,
-
-      onboardingSeen: false,
 
       _hydrated: false,
       set: (key, value) => set({ [key]: value } as Partial<SettingsState>),

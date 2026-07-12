@@ -492,60 +492,158 @@ return ctor.prototype=parent.prototype,child.prototype=new ctor,child.__super__=
     (doc.head || doc.documentElement).appendChild(st);
   }
 
-  function caretRangeAt(doc, x, y) {
+  /**
+   * The caret position under a point — but only ever a *text* position.
+   *
+   * The handles are `pointer-events: auto` (they have to be, to be draggable),
+   * so while you drag one your finger is over them and caretRangeFromPoint
+   * hit-tests the handle instead of the words beneath it. It then answers with a
+   * position in <body> rather than in a text node, and the range built from it
+   * spans half the document — that was the paragraph-wide blue flash, and the
+   * reason a handle would suddenly fly off-screen (it was being drawn at the
+   * first rect of a range that now started at the top of the chapter).
+   *
+   * So: make the overlay transparent to hit-testing for the duration of the
+   * probe, and reject anything that doesn't come back as a text node.
+   */
+  function caretRangeAt(host, x, y) {
+    var doc = host.doc;
+    var hide = [host.startH, host.endH];
+    var prev = hide.map(function (el) {
+      return el ? el.style.pointerEvents : '';
+    });
+    hide.forEach(function (el) {
+      if (el) el.style.pointerEvents = 'none';
+    });
+    var r = null;
     try {
-      if (doc.caretRangeFromPoint) return doc.caretRangeFromPoint(x, y);
-      if (doc.caretPositionFromPoint) {
+      if (doc.caretRangeFromPoint) {
+        r = doc.caretRangeFromPoint(x, y);
+      } else if (doc.caretPositionFromPoint) {
         var p = doc.caretPositionFromPoint(x, y);
         if (p && p.offsetNode) {
-          var r = doc.createRange();
+          r = doc.createRange();
           r.setStart(p.offsetNode, p.offset);
           r.collapse(true);
-          return r;
         }
       }
-    } catch (e) {}
-    return null;
-  }
-
-  // Grow a caret hit into the word under the finger — a long-press that selects
-  // a single character would be useless.
-  function wordRangeAt(doc, x, y) {
-    var r = caretRangeAt(doc, x, y);
+    } catch (e) {
+      r = null;
+    } finally {
+      hide.forEach(function (el, i) {
+        if (el) el.style.pointerEvents = prev[i];
+      });
+    }
+    // A caret in an element (rather than a text node) means we hit chrome, not
+    // prose. Refusing it is what keeps a bad probe from selecting the document.
     if (!r || !r.startContainer || r.startContainer.nodeType !== 3) return null;
-    var node = r.startContainer;
-    var s = node.data;
-    var isWord = function (c) {
-      return !!c && !/[\s.,;:!?()[\]{}"'“”‘’—–…]/.test(c);
-    };
-    var a = r.startOffset;
-    var b = r.startOffset;
-    while (a > 0 && isWord(s.charAt(a - 1))) a--;
-    while (b < s.length && isWord(s.charAt(b))) b++;
-    if (a === b) return null;
-    var out = doc.createRange();
-    out.setStart(node, a);
-    out.setEnd(node, b);
-    return out;
+    return r;
   }
 
-  // Build a non-collapsed Range from two boundary points in unknown order.
-  // setEnd() before start silently collapses rather than throwing, so we detect
-  // that and retry the other way round.
-  function orderedRange(doc, p1, p2) {
-    var r = doc.createRange();
-    try {
-      r.setStart(p1.c, p1.o);
-      r.setEnd(p2.c, p2.o);
-      if (!r.collapsed) return r;
-    } catch (e) {}
-    var r2 = doc.createRange();
-    try {
-      r2.setStart(p2.c, p2.o);
-      r2.setEnd(p1.c, p1.o);
-      if (!r2.collapsed) return r2;
-    } catch (e2) {}
+  // ---- word snapping ----
+  //
+  // Selection is word-granular, like every native reader. Two reasons:
+  //
+  //  - Justified text stretches the spaces between words, so a caret dropped in
+  //    one of those wide gaps is genuinely ambiguous — and a range that ends in
+  //    such a gap paints a selection reading " Boy" or "Boy ", with the space
+  //    included. Snapping outward to word edges (and trimming whitespace) makes
+  //    the selection exactly the words you pointed at.
+  //  - Dragging a handle character-by-character on a touchscreen is miserable.
+  //
+  // The work happens in a flattened copy of the host's text, so a word that
+  // straddles two text nodes (an <em> mid-word, say) still snaps correctly.
+
+  var SEL_BREAK = /[\s.,;:!?()[\]{}"'“”‘’—–…/\\|]/;
+
+  /** The subtree a selection may span: the chapter, the article, or one PDF page. */
+  function selRootFor(host, node) {
+    if (host.kind === 'reflow') {
+      return document.getElementById('rp-article') || host.doc.body;
+    }
+    if (host.kind === 'pdf') {
+      // Bounded to the page under the caret — flattening every rendered page
+      // would let a drag run away across a page break.
+      var el = node && (node.nodeType === 3 ? node.parentElement : node);
+      var layer = el && el.closest ? el.closest('.textLayer') : null;
+      return layer || pdf.pagesEl || host.doc.body;
+    }
+    return host.doc.body || host.doc.documentElement;
+  }
+
+  /** Text nodes of `root`, concatenated, with an index back to each node. */
+  function selFlatten(root) {
+    var doc = root.ownerDocument;
+    var walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false);
+    var nodes = [];
+    var starts = [];
+    var text = '';
+    var n;
+    while ((n = walker.nextNode())) {
+      if (!n.data.length) continue;
+      starts.push(text.length);
+      nodes.push(n);
+      text += n.data;
+    }
+    return { root: root, nodes: nodes, starts: starts, text: text };
+  }
+
+  function selToGlobal(flat, node, offset) {
+    var i = flat.nodes.indexOf(node);
+    if (i < 0) return -1;
+    return flat.starts[i] + offset;
+  }
+
+  function selFromGlobal(flat, g) {
+    for (var i = flat.nodes.length - 1; i >= 0; i--) {
+      if (g >= flat.starts[i]) {
+        return {
+          node: flat.nodes[i],
+          offset: Math.max(0, Math.min(g - flat.starts[i], flat.nodes[i].data.length)),
+        };
+      }
+    }
     return null;
+  }
+
+  /** Grow [gs,ge) out to whole words and drop any whitespace at the edges. */
+  function selSnap(flat, doc, gs, ge) {
+    var t = flat.text;
+    var len = t.length;
+    var s = Math.max(0, Math.min(gs, len));
+    var e = Math.max(0, Math.min(ge, len));
+    if (e < s) {
+      var tmp = s;
+      s = e;
+      e = tmp;
+    }
+
+    // Start: skip forward off any whitespace, then grow left to the word's head.
+    while (s < len && /\s/.test(t.charAt(s))) s++;
+    while (s > 0 && !SEL_BREAK.test(t.charAt(s - 1))) s--;
+
+    // End: pull back off any trailing whitespace, then grow right to the tail.
+    while (e > s && /\s/.test(t.charAt(e - 1))) e--;
+    while (e < len && !SEL_BREAK.test(t.charAt(e))) e++;
+
+    // Landed in a gap with nothing behind it — take the word ahead instead.
+    if (e <= s) {
+      e = s;
+      while (e < len && !SEL_BREAK.test(t.charAt(e))) e++;
+      if (e <= s) return null;
+    }
+
+    var a = selFromGlobal(flat, s);
+    var b = selFromGlobal(flat, e);
+    if (!a || !b) return null;
+    try {
+      var r = doc.createRange();
+      r.setStart(a.node, a.offset);
+      r.setEnd(b.node, b.offset);
+      return r.collapsed ? null : r;
+    } catch (err) {
+      return null;
+    }
   }
 
   function selRects(range) {
@@ -725,22 +823,30 @@ return ctor.prototype=parent.prototype,child.prototype=new ctor,child.__super__=
   }
 
   function selMoveDrag(host, touch) {
+    if (!selCur || !selCur.flat) return;
     var doc = host.doc;
-    var x = touch.clientX + selDragOff.x;
-    var y = touch.clientY + selDragOff.y;
-    var hit = caretRangeAt(doc, x, y);
-    if (!hit || !hit.startContainer) return;
+    var flat = selCur.flat;
+    var hit = caretRangeAt(host, touch.clientX + selDragOff.x, touch.clientY + selDragOff.y);
+    if (!hit) return; // probe missed the text — keep the range we have
+
+    var moving = selToGlobal(flat, hit.startContainer, hit.startOffset);
+    // Outside the subtree this selection lives in (a different page, the chrome).
+    if (moving < 0) return;
+
     var rng = selCur.range;
     var fixed =
       selDrag === 'start'
-        ? { c: rng.endContainer, o: rng.endOffset }
-        : { c: rng.startContainer, o: rng.startOffset };
-    var moving = { c: hit.startContainer, o: hit.startOffset };
-    var next = orderedRange(doc, fixed, moving);
+        ? selToGlobal(flat, rng.endContainer, rng.endOffset)
+        : selToGlobal(flat, rng.startContainer, rng.startOffset);
+    if (fixed < 0) return;
+
+    var next = selSnap(flat, doc, Math.min(fixed, moving), Math.max(fixed, moving));
     if (!next) return;
+
     // Dragging one handle past the other flips which end it now controls.
-    selDrag =
-      next.startContainer === moving.c && next.startOffset === moving.o ? 'start' : 'end';
+    if (moving < fixed) selDrag = 'start';
+    else selDrag = 'end';
+
     selCur.range = next;
     selPaint();
   }
@@ -831,9 +937,17 @@ return ctor.prototype=parent.prototype,child.prototype=new ctor,child.__super__=
         lpTimer = setTimeout(function () {
           lpTimer = null;
           if (moved) return;
-          var r = wordRangeAt(doc, sx, sy);
+          var hit = caretRangeAt(host, sx, sy);
+          if (!hit) return;
+          // The flattened text is computed once here and reused for the whole
+          // gesture — rebuilding it on every drag frame would walk the chapter
+          // hundreds of times a second.
+          var flat = selFlatten(selRootFor(host, hit.startContainer));
+          var g = selToGlobal(flat, hit.startContainer, hit.startOffset);
+          if (g < 0) return;
+          var r = selSnap(flat, doc, g, g);
           if (!r) return;
-          selCur = { host: host, range: r };
+          selCur = { host: host, range: r, flat: flat };
           selDrag = null;
           suppressTapUntil = Date.now() + 600;
           selPaint();
@@ -2335,10 +2449,13 @@ return ctor.prototype=parent.prototype,child.prototype=new ctor,child.__super__=
       }
       if (!root) return;
       try {
-        var r = host.doc.createRange();
-        r.selectNodeContents(root);
-        if (!String(r.toString()).trim()) return;
-        selCur = { host: host, range: r };
+        var flat = selFlatten(root);
+        if (!flat.text.trim()) return;
+        var r = selSnap(flat, host.doc, 0, flat.text.length);
+        if (!r) return;
+        // Carry the flattened text, so the handles can still be dragged to
+        // narrow a select-all down.
+        selCur = { host: host, range: r, flat: flat };
         selDrag = null;
         selPaint();
         selPost();
